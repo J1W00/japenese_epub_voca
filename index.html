@@ -20,8 +20,8 @@
   --shadow:0 2px 12px rgba(26,26,46,.07);
   --r:10px;
   --pos-verb:#fde68a;
-  --pos-noun:#bae6fd;
-  --pos-iadj:#bbf7d0;
+  --pos-noun:#c9f5de;
+  --pos-iadj:#d6f0fd;
   --pos-nadj:#e9d5ff;
   --pos-adv:#fed7aa;
   --pos-other:#e2e8f0;
@@ -294,10 +294,10 @@ header h1 em{color:#e8b4b8;font-style:normal}
 .pdf-hl-dup{padding-bottom:1px}
 .pdf-hl.pos-verb{background:#fde68a}
 .pdf-hl-dup.pos-verb{border-bottom:2px solid #fde68a}
-.pdf-hl.pos-noun{background:#bbf7d0}
-.pdf-hl-dup.pos-noun{border-bottom:2px solid #bbf7d0}
-.pdf-hl.pos-iadj{background:#bae6fd}
-.pdf-hl-dup.pos-iadj{border-bottom:2px solid #bae6fd}
+.pdf-hl.pos-noun{background:#c9f5de}
+.pdf-hl-dup.pos-noun{border-bottom:2px solid #c9f5de}
+.pdf-hl.pos-iadj{background:#d6f0fd}
+.pdf-hl-dup.pos-iadj{border-bottom:2px solid #d6f0fd}
 .pdf-hl.pos-nadj{background:#e9d5ff}
 .pdf-hl-dup.pos-nadj{border-bottom:2px solid #e9d5ff}
 .pdf-hl.pos-adv{background:#fed7aa}
@@ -415,7 +415,7 @@ header h1 em{color:#e8b4b8;font-style:normal}
           <span class="v-badge" id="count-badge">0</span>
         </div>
         <div class="exp-row">
-          <button class="exp-btn" id="reextract-sent-btn" title="EPUB 본문에서 출처 문장 재추출">↺ 문장 재추출</button>
+          <button class="exp-btn" id="reextract-sent-btn" title="EPUB 본문에서 출처 문장 재추출 + 품사 재분류">↺ 문장·품사 새로고침</button>
           <button class="exp-btn" id="export-tsv-btn">↓ TSV</button>
           <button class="exp-btn" id="export-xlsx-btn">↓ Excel</button>
           <button class="exp-btn pdf" id="export-pdf-btn">↓ PDF</button>
@@ -555,7 +555,7 @@ const POS_DIRECT = {
 const POS_FALLBACK = [
   { css:'pos-verb',  label:'동사',    re:/動詞|verb|する動詞|vt|vi/i },
   { css:'pos-iadj',  label:'い형용사', re:/い形容詞|イ形容詞|い形|iadj/i },
-  { css:'pos-nadj',  label:'な형용사', re:/な形容詞|ナ形容詞|な形|nadj|形容動詞/i },
+  { css:'pos-nadj',  label:'な형용사', re:/な形容詞|ナ形容詞|な形|nadj|形容動詞|형용동사/i },
   { css:'pos-noun',  label:'명사',    re:/名詞|noun/i },
   { css:'pos-adv',   label:'부사',    re:/副詞|adv/i },
 ];
@@ -563,6 +563,9 @@ function normalizePos(raw) {
   if (!raw) return { label:'', css:'pos-other' };
   const s = raw.trim();
   if (POS_DIRECT[s]) return POS_DIRECT[s];
+  // 복합 품사 처리 (예: '명사・동사', '명사/동사') → 첫 번째 우선
+  const first = s.split(/[・\/·,]+/)[0].trim();
+  if (first && first !== s && POS_DIRECT[first]) return POS_DIRECT[first];
   for (const e of POS_FALLBACK) { if (e.re.test(s)) return { css: e.css, label: e.label }; }
   return { label: s, css:'pos-other' };
 }
