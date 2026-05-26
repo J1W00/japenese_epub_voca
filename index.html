@@ -1354,15 +1354,47 @@ function hideSelPanel() {
 }
 
 function extractSentence(range) {
-  const tn = range.commonAncestorContainer;
-  const full = tn.nodeType===Node.TEXT_NODE ? tn.textContent : tn.textContent||'';
-  const off  = range.startOffset;
-  const back = full.slice(0,off);
-  const last = Math.max(back.lastIndexOf('。'),back.lastIndexOf('！'),back.lastIndexOf('？'),back.lastIndexOf('!'),back.lastIndexOf('?'),back.lastIndexOf('\n'),back.lastIndexOf('.'));
-  const start = last>=0?last+1:0;
-  let end=off;
-  for(let i=off;i<full.length;i++){if(/[。！？!?\n.]/.test(full[i])){end=i+1;break;}end=i+1;}
-  return full.slice(start,end).trim().replace(/\s+/g,' ');
+  // 선택 범위가 속한 블록 요소(p, div, li 등)를 찾아 전체 텍스트를 기준으로 삼음
+  function getBlockAncestor(node) {
+    const BLOCK = /^(P|DIV|LI|TD|SECTION|ARTICLE|BLOCKQUOTE|H[1-6]|RUBY)$/;
+    let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    while (el && el !== epubReader) {
+      if (BLOCK.test(el.tagName)) return el;
+      el = el.parentElement;
+    }
+    return epubReader;
+  }
+
+  // 블록 내에서 range.startContainer の前までの文字数を数える
+  function offsetInBlock(block, targetNode, targetOffset) {
+    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+    let pos = 0;
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node === targetNode) return pos + targetOffset;
+      pos += node.textContent.length;
+    }
+    return pos;
+  }
+
+  const block = getBlockAncestor(range.startContainer);
+  const full  = block.textContent || '';
+  const off   = offsetInBlock(block, range.startContainer, range.startOffset);
+
+  const back  = full.slice(0, off);
+  const last  = Math.max(
+    back.lastIndexOf('。'), back.lastIndexOf('！'), back.lastIndexOf('？'),
+    back.lastIndexOf('!'),  back.lastIndexOf('?'),  back.lastIndexOf('\n'),
+    back.lastIndexOf('.')
+  );
+  const start = last >= 0 ? last + 1 : 0;
+
+  let end = off;
+  for (let i = off; i < full.length; i++) {
+    if (/[。！？!?\n.]/.test(full[i])) { end = i + 1; break; }
+    end = i + 1;
+  }
+  return full.slice(start, end).trim().replace(/\s+/g, ' ');
 }
 
 function handleSel() {
@@ -2039,4 +2071,3 @@ document.getElementById('pdf-preview-backdrop').addEventListener('click', e => {
 </html>
 
   <!-- RIGHT: EPUB -->
-
