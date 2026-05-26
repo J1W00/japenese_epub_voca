@@ -415,6 +415,7 @@ header h1 em{color:#e8b4b8;font-style:normal}
           <span class="v-badge" id="count-badge">0</span>
         </div>
         <div class="exp-row">
+          <button class="exp-btn" id="reextract-sent-btn" title="EPUB 본문에서 출처 문장 재추출">↺ 문장 재추출</button>
           <button class="exp-btn" id="export-tsv-btn">↓ TSV</button>
           <button class="exp-btn" id="export-xlsx-btn">↓ Excel</button>
           <button class="exp-btn pdf" id="export-pdf-btn">↓ PDF</button>
@@ -1661,6 +1662,55 @@ document.getElementById('export-xlsx-btn').addEventListener('click',()=>{
   XLSX.utils.book_append_sheet(wb,ws,(currentEpubFilename||'단어장').slice(0,31));
   XLSX.writeFile(wb,(currentEpubFilename||'단어장').replace(/[/\\?%*:|"<>]/g,'_')+'_단어장.xlsx');
   showToast('Excel 저장 완료!');
+});
+
+/* ═══════════════════════════════════════
+   문장 재추출 + 품사 재분류 (API 호출 없음)
+═══════════════════════════════════════ */
+document.getElementById('reextract-sent-btn').addEventListener('click', () => {
+  if (!vocab.length) { alert('단어장이 비어있습니다.'); return; }
+  if (!epubSpines.length) { alert('EPUB을 먼저 열어주세요.\n출처 문장 재추출에는 본문이 필요합니다.'); return; }
+  if (!confirm(`단어장의 ${vocab.length}개 단어를 재처리합니다.\n• 출처 문장: EPUB 본문에서 재추출\n• 품사: 로컬 규칙으로 재분류 (API 호출 없음)\n\n진행합니까?`)) return;
+
+  // EPUB 전체 텍스트 수집
+  const parser = new DOMParser();
+  const allSentences = [];
+  epubSpines.forEach(spine => {
+    const doc = parser.parseFromString(spine.rawHtml, 'text/html');
+    doc.body.querySelectorAll('p, h1, h2, h3, li, div').forEach(el => {
+      if (el.querySelector('p,li,h1,h2,h3')) return;
+      const full = el.textContent.trim();
+      if (!full) return;
+      full.split(/(?<=[。！？!?\n])/).forEach(s => {
+        const t = s.trim();
+        if (t) allSentences.push({ text: t, full });
+      });
+    });
+  });
+
+  // 단어가 포함된 가장 짧은 문장 반환
+  function findSentence(word) {
+    const hits = allSentences.filter(s => s.text.includes(word));
+    if (hits.length) return hits.sort((a, b) => a.text.length - b.text.length)[0].text;
+    const para = allSentences.find(s => s.full.includes(word));
+    return para ? para.full : '';
+  }
+
+  let sentUpdated = 0, posUpdated = 0;
+  vocab.forEach((v, i) => {
+    // 1. 출처 문장 재추출
+    const sent = findSentence(v.sel_text || v.word);
+    if (sent) { vocab[i].source_sentence = sent; sentUpdated++; }
+
+    // 2. 품사 재분류: normalizePos()로 정규화
+    const { label } = normalizePos(v.part_of_speech);
+    if (label !== v.part_of_speech) { vocab[i].part_of_speech = label; posUpdated++; }
+  });
+
+  saveVocab();
+  renderVocab();
+  reapplyHighlights();
+  showToast(`완료! 문장 ${sentUpdated}개 갱신, 품사 ${posUpdated}개 수정`, 3000);
 });
 
 // ── PDF 시스템 ──
