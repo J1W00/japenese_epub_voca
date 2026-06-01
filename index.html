@@ -62,9 +62,6 @@ header h1 em{color:#e8b4b8;font-style:normal}
 /* ── Main layout ── */
 .main{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;min-height:0}
 .main.portrait{grid-template-columns:1fr;grid-template-rows:1fr 3fr}
-.main.portrait .draw-inner{grid-template-columns:1fr;grid-template-rows:auto auto;overflow-y:auto}
-.main.portrait .draw-left{border-right:none;border-bottom:1px solid var(--border);overflow:visible}
-.main.portrait .draw-right{overflow:visible}
 @media(max-width:700px){.main{grid-template-columns:1fr}}
 
 /* ══════════════════════════════
@@ -177,7 +174,7 @@ header h1 em{color:#e8b4b8;font-style:normal}
 #status.ok{color:#2d6a4f}
 
 /* 결과 영역 */
-#result-area{background:white;border:1px solid var(--border);border-radius:var(--r);padding:10px;min-height:60px;overflow:visible}
+#result-area{background:white;border:1px solid var(--border);border-radius:var(--r);padding:10px;min-height:60px;overflow:hidden}
 .res-empty{color:var(--ink-f);font-size:12px;text-align:center;padding:8px 4px;font-style:italic;line-height:1.6;overflow:hidden;word-break:keep-all}
 .res-word{font-family:'Noto Serif JP',serif;font-size:30px;font-weight:700;line-height:1;margin-bottom:4px}
 .res-reading{font-family:'Noto Serif JP',serif;font-size:13px;color:var(--blue)}
@@ -885,7 +882,11 @@ function renderVocab() {
         </div>
         <div class="vc-mean">${v.meaning||''}</div>
         ${v.kanji_breakdown&&v.kanji_breakdown.length?`<div class="vc-kanji">${v.kanji_breakdown.map(k=>k.char+(k.reading?'('+k.reading+')':'')+' '+k.meaning).join(' · ')}</div>`:''}
-        ${v.source_sentence?`<div class="vc-sent">${v.source_sentence.replace(new RegExp('('+v.word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','g'),'<em>$1</em>')}</div>`:''}
+        ${v.source_sentence?`<div class="vc-sent">${(()=>{
+          const targets=[v.word,v.sel_text].filter(Boolean).filter((t,i,a)=>a.indexOf(t)===i);
+          const re=new RegExp('('+targets.map(t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')','g');
+          return v.source_sentence.replace(re,'<em>$1</em>');
+        })()}</div>`:''}
       </div>
       <button class="vc-del" data-i="${i}">×</button>
     </div>`).join('');
