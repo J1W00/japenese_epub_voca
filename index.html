@@ -882,11 +882,7 @@ function renderVocab() {
         </div>
         <div class="vc-mean">${v.meaning||''}</div>
         ${v.kanji_breakdown&&v.kanji_breakdown.length?`<div class="vc-kanji">${v.kanji_breakdown.map(k=>k.char+(k.reading?'('+k.reading+')':'')+' '+k.meaning).join(' · ')}</div>`:''}
-        ${v.source_sentence?`<div class="vc-sent">${(()=>{
-          const targets=[v.word,v.sel_text].filter(Boolean).filter((t,i,a)=>a.indexOf(t)===i);
-          const re=new RegExp('('+targets.map(t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')','g');
-          return v.source_sentence.replace(re,'<em>$1</em>');
-        })()}</div>`:''}
+        ${v.source_sentence?`<div class="vc-sent">${(()=>{const ts=[v.word,v.sel_text].filter(Boolean).filter((t,i,a)=>a.indexOf(t)===i);const re=new RegExp('('+ts.map(t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')','g');return v.source_sentence.replace(re,'<em>$1</em>');})()}</div>`:''}
       </div>
       <button class="vc-del" data-i="${i}">×</button>
     </div>`).join('');
@@ -1642,12 +1638,13 @@ function formatKanjiBreakdown(kb) {
   if (!kb || !kb.length) return '';
   return kb.map(k => `${k.char}(${k.reading||''}·${k.meaning||''})`).join(' / ');
 }
-function formatSentence(sentence, word) {
+function formatSentence(sentence, word, selText) {
   if (!sentence || !word) return sentence || '';
-  const escaped = word.replace(/[-[\]{}()*+?.,\\^$|#]/g, '\\$&');
-  return sentence.replace(new RegExp(escaped, 'g'), '<span class="hl-word">' + word + '</span>');
+  const targets = [word, selText].filter(Boolean).filter((t,i,a)=>a.indexOf(t)===i);
+  const re = new RegExp('('+targets.map(t=>t.replace(/[-[\]{}()*+?.,\\^$|#]/g,'\\$&')).join('|')+')','g');
+  return sentence.replace(re, '<span class="hl-word">$1</span>');
 }
-function vocabToRows(){return vocab.map(v=>[v.title||currentEpubFilename||'',v.word||'',v.reading||'',v.part_of_speech||'',v.meaning||'',formatSentence(v.source_sentence, v.word),formatKanjiBreakdown(v.kanji_breakdown)]);}
+function vocabToRows(){return vocab.map(v=>[v.title||currentEpubFilename||'',v.word||'',v.reading||'',v.part_of_speech||'',v.meaning||'',formatSentence(v.source_sentence, v.word, v.sel_text),formatKanjiBreakdown(v.kanji_breakdown)]);}
 
 
 document.getElementById('export-tsv-btn').addEventListener('click',()=>{
