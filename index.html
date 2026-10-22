@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EPUB 日本語 단어장</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Sans+KR:wght@300;400;500&display=swap');
+:root{
+  --ink:#1a1a2e;--ink-l:#4a4a6a;--ink-f:#9090b0;
+  --paper:#faf8f3;--paper-d:#f0ece0;
+  --border:#ddd8cc;--border-l:#eee8dc;
+  --accent:#8b1a1a;--accent-bg:#c0392b18;
+  --blue:#1a3d6d;--blue-bg:#dbeafe;
+  --hl:#ffe066;--hl-dark:#f5c800;
+  --shadow:0 2px 12px rgba(26,26,46,.07);
+  --r:10px;
+  /* 품사별 색상 (파스텔 B안) */
+  --pos-verb:#fde68a;       /* 동사 */
+  --pos-noun:#bae6fd;       /* 명사 */
+  --pos-iadj:#bbf7d0;       /* い형용사 */
+  --pos-nadj:#e9d5ff;       /* な형용사 */
+  --pos-adv:#fed7aa;        /* 부사 */
+  --pos-other:#e2e8f0;      /* 기타 */
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--paper);color:var(--ink);font-family:'Noto Sans KR',sans-serif;font-weight:300;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── Header ── */
+header{background:var(--ink);color:var(--paper);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:200;min-width:0;overflow:hidden}
+header h1{font-family:'Noto Serif JP',serif;font-size:15px;font-weight:700;letter-spacing:1.5px;white-space:nowrap}
+header h1 em{color:#e8b4b8;font-style:normal}
+#hd-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+#hd-meta{font-size:11px;color:#aaa}
+#hd-count{font-size:10px;background:#333;padding:2px 6px;border-radius:10px;color:#ddd;white-space:nowrap}
+#storage-btn{background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1}
+
+/* ── Top bar ── */
+#top-bar{background:#fff;border-bottom:1px solid var(--border);padding:6px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0;min-width:0}
+.tf{display:flex;align-items:center;gap:5px}
+.tf label{font-size:10px;color:var(--ink-f);white-space:nowrap;font-weight:500;letter-spacing:.5px}
+.tf input{padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:'Noto Sans KR',sans-serif;background:var(--paper);color:var(--ink)}
+.tf input:focus{outline:none;border-color:#c2185b}
+#api-key-input{font-family:monospace;width:165px}
+#api-save-btn{padding:5px 10px;background:var(--ink);color:white;border:none;border-radius:6px;font-size:11px;cursor:pointer}
+#api-status{font-size:11px;color:#2d6a4f}
+.tsep{width:1px;height:18px;background:var(--border);flex-shrink:0}
+
+/* ── Main layout ── */
+.main{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;min-height:0}
+.main.portrait{grid-template-columns:1fr;grid-template-rows:1fr 3fr}
+@media(max-width:700px){.main{grid-template-columns:1fr}}
+
+/* ══════════════════════════════
+   LEFT: EPUB Panel
+══════════════════════════════ */
+.epub-panel{display:flex;flex-direction:column;border-left:1px solid var(--border);overflow:hidden;background:#fff}
+.main.portrait .epub-panel{border-left:none;border-top:1px solid var(--border)}
+.epub-toolbar{padding:7px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;flex-shrink:0;background:var(--paper);flex-wrap:wrap}
+.main.portrait .epub-toolbar{padding:5px 8px;gap:5px}
+.ep-label{font-size:10px;color:var(--ink-f);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.main.portrait .ep-label{display:none}
+#epub-file-btn{padding:5px 11px;border:1px dashed var(--border);border-radius:6px;background:white;font-size:12px;cursor:pointer;color:var(--ink-l);transition:all .15s}
+#epub-file-btn:hover{border-color:var(--ink);color:var(--ink)}
+#epub-file-input{display:none}
+.enav{padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:white;font-size:13px;cursor:pointer;color:var(--ink);line-height:1;transition:all .15s}
+.enav:hover{background:var(--paper-d)}
+.enav:disabled{opacity:.3;cursor:not-allowed}
+#epub-page-info{font-size:11px;color:var(--ink-f);white-space:nowrap}
+.efont{padding:3px 7px;border:1px solid var(--border);border-radius:5px;background:white;font-size:11px;cursor:pointer;color:var(--ink-l);transition:all .15s}
+.efont:hover{background:var(--paper-d)}
+.efont.active{border-color:var(--ink);color:var(--ink);font-weight:500}
+/* reader 배경 테마 */
+#epub-reader.theme-white{background:#ffffff;color:#1a1a2e}
+#epub-reader.theme-sepia{background:#f5f0e8;color:#3b2f1e}
+#epub-reader.theme-dark{background:#1e1e2e;color:#cdd6f4}
+#epub-reader.theme-dark .epub-hl{background:#f9e05a;color:#1e1e2e}
+#epub-reader.theme-dark a{color:#89b4fa}
+.epub-inner{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+#epub-drop-zone{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;color:var(--ink-f);border:2px dashed transparent;transition:all .2s}
+#epub-drop-zone.drag-over{border-color:var(--blue);background:var(--blue-bg)}
+#epub-drop-zone .drop-icon{font-size:44px;margin-bottom:12px;opacity:.3}
+#epub-drop-zone p{font-size:13px;line-height:1.9}
+#epub-reader{flex:1;overflow-y:auto;overflow-x:hidden;padding:22px 26px;display:none;line-height:1.95;font-family:'Noto Serif JP',serif;font-size:16px;color:var(--ink);overflow-wrap:break-word;word-break:break-all}
+#epub-reader.active{display:block}
+#epub-reader ::selection{background:#c2185b33}
+/* 하이라이트 — 품사별 (첫 등장: 배경, 중복: 같은 색 밑줄) */
+.epub-hl{border-radius:2px;cursor:pointer}
+.epub-hl-dup{background:transparent!important;cursor:pointer;padding-bottom:1px}
+/* 동사 */
+.epub-hl.pos-verb{background:var(--pos-verb)}
+.epub-hl-dup.pos-verb{border-bottom:2px solid var(--pos-verb)}
+.epub-hl-dup.pos-verb:hover{background:color-mix(in srgb,var(--pos-verb) 30%,transparent)!important}
+/* 명사 */
+.epub-hl.pos-noun{background:var(--pos-noun)}
+.epub-hl-dup.pos-noun{border-bottom:2px solid var(--pos-noun)}
+.epub-hl-dup.pos-noun:hover{background:color-mix(in srgb,var(--pos-noun) 30%,transparent)!important}
+/* い형용사 */
+.epub-hl.pos-iadj{background:var(--pos-iadj)}
+.epub-hl-dup.pos-iadj{border-bottom:2px solid var(--pos-iadj)}
+.epub-hl-dup.pos-iadj:hover{background:color-mix(in srgb,var(--pos-iadj) 30%,transparent)!important}
+/* な형용사 */
+.epub-hl.pos-nadj{background:var(--pos-nadj)}
+.epub-hl-dup.pos-nadj{border-bottom:2px solid var(--pos-nadj)}
+.epub-hl-dup.pos-nadj:hover{background:color-mix(in srgb,var(--pos-nadj) 30%,transparent)!important}
+/* 부사 */
+.epub-hl.pos-adv{background:var(--pos-adv)}
+.epub-hl-dup.pos-adv{border-bottom:2px solid var(--pos-adv)}
+.epub-hl-dup.pos-adv:hover{background:color-mix(in srgb,var(--pos-adv) 30%,transparent)!important}
+/* 기타 */
+.epub-hl.pos-other{background:var(--pos-other)}
+.epub-hl-dup.pos-other{border-bottom:2px solid var(--pos-other)}
+.epub-hl-dup.pos-other:hover{background:color-mix(in srgb,var(--pos-other) 30%,transparent)!important}
+#toc-panel{display:none;position:absolute;top:0;left:0;bottom:0;width:220px;background:white;border-right:1px solid var(--border);z-index:100;overflow-y:auto;padding:10px;box-shadow:4px 0 16px rgba(0,0,0,.1)}
+#toc-panel h3{font-size:11px;color:var(--ink-f);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;padding:4px 6px}
+.toc-item{padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--ink-l);transition:all .15s;border:none;background:none;width:100%;text-align:left;font-family:'Noto Sans KR',sans-serif}
+.toc-item:hover{background:var(--paper-d);color:var(--ink)}
+.toc-item.active{background:var(--blue-bg);color:var(--blue);font-weight:500}
+
+/* ══════════════════════════════
+   RIGHT: Vocab Panel
+══════════════════════════════ */
+.vocab-panel{display:flex;flex-direction:column;overflow:hidden}
+.tab-bar{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--paper)}
+.tab-btn{flex:1;padding:10px 8px;border:none;background:none;font-size:12px;font-family:'Noto Sans KR',sans-serif;color:var(--ink-f);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tab-btn.active{color:var(--ink);border-bottom-color:var(--ink);font-weight:500}
+.tab-btn:hover:not(.active){color:var(--ink-l);background:var(--paper-d)}
+.tab-content{display:none;flex:1;overflow:hidden;flex-direction:column;min-height:0}
+.tab-content.active{display:flex}
+
+/* ── 입력 탭: 좌우 분할 ── */
+.draw-inner{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;min-height:0}
+.draw-left{padding:10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;border-right:1px solid var(--border)}
+.draw-right{padding:10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-width:0}
+
+/* 텍스트 입력 */
+/* 선택 단어 패널 (왼쪽 하단) */
+#sel-word-panel{background:var(--paper);border:1px solid var(--border);border-radius:var(--r);padding:10px;display:none;flex-direction:column;gap:7px}
+#sel-word-panel.visible{display:flex}
+#sel-word-display{font-family:'Noto Serif JP',serif;font-size:22px;color:#c2185b;font-weight:700;text-align:center}
+#sel-sentence-display{font-size:10px;color:var(--ink-f);line-height:1.5;font-family:'Noto Serif JP',serif}
+#sel-sentence-display em{color:#c2185b;font-style:normal;font-weight:500}
+.sel-panel-btns{display:flex;gap:6px}
+
+/* 버튼 공통 */
+.btn{flex:1;padding:8px;border-radius:var(--r);border:1px solid var(--border);background:white;font-size:12px;font-family:'Noto Sans KR',sans-serif;color:var(--ink);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:4px}
+.btn:hover{background:var(--paper-d)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:500}
+.btn.primary:hover{background:#2d2d4e}
+.btn.accent{background:var(--accent);color:white;border-color:var(--accent)}
+.btn.accent:hover{background:#a02020}
+
+#status{font-size:11px;color:var(--ink-f);text-align:center;min-height:15px}
+/* 검색 기록 */
+#search-history{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.sh-item{display:flex;align-items:center;gap:6px;padding:5px 8px;background:white;border:1px solid var(--border-l);border-radius:7px;cursor:pointer;transition:all .15s}
+.sh-item:hover{border-color:var(--blue);background:var(--blue-bg)}
+.sh-word{font-family:'Noto Serif JP',serif;font-size:16px;font-weight:700;color:var(--ink);min-width:28px}
+.sh-info{flex:1;min-width:0}
+.sh-reading{font-size:10px;color:var(--blue);font-family:'Noto Serif JP',serif}
+.sh-meaning{font-size:10px;color:var(--ink-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-label{font-size:9px;color:var(--ink-f);font-weight:500;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px}
+#status.error{color:var(--accent)}
+#status.ok{color:#2d6a4f}
+
+/* 결과 영역 */
+#result-area{background:white;border:1px solid var(--border);border-radius:var(--r);padding:10px;min-height:60px;overflow:hidden}
+.res-empty{color:var(--ink-f);font-size:12px;text-align:center;padding:8px 4px;font-style:italic;line-height:1.6;overflow:hidden;word-break:keep-all}
+.res-word{font-family:'Noto Serif JP',serif;font-size:30px;font-weight:700;line-height:1;margin-bottom:4px}
+.res-reading{font-family:'Noto Serif JP',serif;font-size:13px;color:var(--blue)}
+.res-pos{display:inline-block;font-size:10px;padding:1px 5px;border-radius:4px;background:var(--blue-bg);color:var(--blue);margin-left:4px;vertical-align:middle}
+.res-meaning{font-size:13px;font-weight:500;margin:6px 0 7px}
+.res-ex{border-top:1px solid var(--border-l);padding-top:7px}
+.res-kanji-breakdown{border-top:1px solid var(--border-l);padding-top:7px;margin-top:2px;display:flex;flex-wrap:wrap;gap:5px}
+.kanji-chip{background:var(--blue-bg);border-radius:7px;padding:4px 7px;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:36px}
+.kanji-chip-char{font-family:'Noto Serif JP',serif;font-size:18px;font-weight:700;color:var(--ink);line-height:1}
+.kanji-chip-read{font-size:9px;color:var(--blue);font-family:'Noto Serif JP',serif}
+.kanji-chip-mean{font-size:9px;color:var(--ink-f)}
+.ex-label{font-size:9px;color:var(--ink-f);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px}
+.ex-jp{font-family:'Noto Serif JP',serif;font-size:11px;line-height:1.7}
+.ex-jp em{color:#c2185b;font-style:normal;font-weight:500}
+#add-btn-wrap{display:none}
+
+/* ── 단어장 탭 ── */
+.vlist-header{padding:9px 12px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.v-badge{font-size:10px;background:var(--ink);color:var(--paper);padding:2px 7px;border-radius:10px}
+.exp-row{display:flex;gap:5px}
+.exp-btn{font-size:11px;padding:4px 9px;border:1px solid var(--border);border-radius:5px;background:white;cursor:pointer;color:var(--ink-l);transition:all .15s;white-space:nowrap}
+.exp-btn:hover{background:var(--paper-d)}
+.exp-btn.batch{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:500}
+.exp-btn.batch:hover{background:#2d2d4e}
+.exp-btn.batch:disabled{opacity:.6;cursor:wait}
+.vcard.pending{border-style:dashed;background:#fffdf5}
+.exp-btn.pdf{color:var(--accent);border-color:#f5c6c6}
+.exp-btn.pdf:hover{background:#fff0f0}
+#vocab-list{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px;min-height:0}
+.vempty{text-align:center;color:var(--ink-f);font-size:12px;padding:30px 0;font-style:italic;line-height:2.2}
+.vempty .big{font-family:'Noto Serif JP',serif;font-size:40px;color:var(--border);display:block;margin-bottom:6px}
+.vcard{background:white;border:1px solid var(--border-l);border-radius:var(--r);padding:8px 11px;display:flex;align-items:center;gap:9px;transition:box-shadow .15s;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.vcard:hover{box-shadow:var(--shadow)}
+.vc-word{font-family:'Noto Serif JP',serif;font-size:22px;font-weight:700;min-width:34px;text-align:center}
+.vc-body{flex:1;min-width:0}
+.vc-read{font-family:'Noto Serif JP',serif;font-size:11px;color:var(--blue)}
+.vc-pos{display:inline-block;font-size:9px;padding:1px 4px;border-radius:3px;background:var(--blue-bg);color:var(--blue);margin-left:3px}
+.vc-mean{font-size:11px;color:var(--ink-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vc-sent{font-size:10px;color:var(--ink-f);margin-top:2px;line-height:1.5;font-family:'Noto Serif JP',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vc-sent em{color:#c2185b;font-style:normal;font-weight:500}
+.vc-kanji{font-size:9px;color:var(--ink-f);margin-top:1px;line-height:1.4}
+.vc-del{background:none;border:none;color:var(--ink-f);font-size:15px;cursor:pointer;padding:3px;border-radius:4px;flex-shrink:0;transition:all .15s}
+.vc-del:hover{color:var(--accent);background:var(--accent-bg)}
+
+
+/* ── 모달 공통 ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:none;align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal-box{background:white;border-radius:14px;padding:20px;width:360px;max-width:92vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:14px;position:relative;z-index:3001}
+.modal-box h2{font-size:14px;font-weight:500;color:var(--ink)}
+.modal-close{padding:8px;background:var(--paper);border:1px solid var(--border);border-radius:7px;font-size:12px;cursor:pointer;color:var(--ink-l)}
+.modal-close:hover{background:var(--paper-d)}
+
+/* API 키 모달 */
+.api-key-row{display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--paper);border-radius:8px;border:1px solid var(--border)}
+.api-key-row.active-key{border-color:#2d6a4f;background:#f0faf4}
+.api-key-dot{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;cursor:pointer}
+.api-key-dot.on{background:#2d6a4f}
+.api-key-label{flex:1;font-size:12px;font-family:monospace;color:var(--ink-l);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.api-key-label.on{color:var(--ink);font-weight:500}
+.api-key-del{background:none;border:none;color:var(--ink-f);font-size:14px;cursor:pointer;padding:2px 4px;border-radius:4px;flex-shrink:0}
+.api-key-del:hover{color:var(--accent)}
+.api-add-row{display:flex;gap:6px}
+#api-new-input{flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;font-family:monospace;background:var(--paper);color:var(--ink)}
+#api-new-input:focus{outline:none;border-color:#2d6a4f}
+#api-add-btn{padding:7px 13px;background:var(--ink);color:white;border:none;border-radius:7px;font-size:12px;cursor:pointer}
+#api-key-status-bar{font-size:11px;color:#2d6a4f;min-height:14px}
+
+/* 저장소 모달 */
+.sm-section{background:var(--paper);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:7px}
+.sm-section h3{font-size:11px;font-weight:500;color:var(--ink-f);text-transform:uppercase;letter-spacing:.8px}
+.sm-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sm-label{font-size:12px;color:var(--ink-l)}
+.sm-value{font-size:12px;color:var(--ink);font-weight:500;text-align:right;flex:1}
+.sm-btn{padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:white;font-size:11px;cursor:pointer;color:var(--ink-l);white-space:nowrap}
+.sm-btn:hover{background:var(--paper-d)}
+.sm-btn.danger{color:var(--accent);border-color:#f5c6c6}
+.sm-btn.danger:hover{background:#fff0f0}
+.sm-btn.ok{background:var(--ink);color:white;border-color:var(--ink)}
+.sm-progress-list{display:flex;flex-direction:column;gap:4px;max-height:130px;overflow-y:auto}
+.sm-pi{display:flex;align-items:center;gap:6px;padding:5px 8px;background:white;border-radius:6px;border:1px solid var(--border-l)}
+.sm-pi-name{flex:1;font-size:11px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sm-pi-info{font-size:10px;color:var(--ink-f);white-space:nowrap}
+.sm-pi-del{background:none;border:none;color:var(--ink-f);font-size:13px;cursor:pointer;padding:1px 4px;border-radius:3px}
+.sm-pi-del:hover{color:var(--accent)}
+
+/* 스피너 */
+.spinner{display:inline-block;width:11px;height:11px;border:2px solid #ccc;border-top-color:var(--ink);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:3px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 토스트 */
+/* PDF 미리보기 모달 */
+#pdf-preview-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:16px}
+#pdf-preview-backdrop.open{display:flex}
+#pdf-preview-modal{background:#f0f0f0;border-radius:12px;width:min(900px,98vw);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.4);margin:auto;max-height:95vh}
+#pdf-preview-toolbar{background:#2d2d2d;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0}
+#pdf-preview-toolbar .toolbar-title{color:#ccc;font-size:11px;white-space:nowrap;flex:1}
+#pdf-progress-msg{color:#aaa;font-size:11px;white-space:nowrap}
+#pdf-download-btn{padding:7px 18px;background:#ffe066;color:#1a1a2e;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+#pdf-download-btn:hover{background:#f5c800}
+#pdf-download-btn:disabled{opacity:.5;cursor:not-allowed}
+#pdf-close-btn{padding:6px 12px;background:rgba(255,255,255,.1);color:#ccc;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap}
+#pdf-close-btn:hover{background:rgba(255,255,255,.2)}
+#pdf-pages-wrap{padding:20px;display:flex;flex-direction:column;align-items:center;gap:16px;overflow:auto;flex:1}
+
+/* PDF 페이지 — 가변 높이 (잘리지 않음) */
+.pdf-page{background:white;width:794px;min-height:200px;box-shadow:0 2px 16px rgba(0,0,0,.2);font-family:'Noto Sans KR',sans-serif;font-size:13px;box-sizing:border-box;padding:48px 48px 48px;position:relative;flex-shrink:0;page-break-after:always}
+.pdf-page-header{border-bottom:2px solid #1a1a2e;padding-bottom:10px;margin-bottom:20px;display:flex;align-items:baseline;justify-content:space-between}
+.pdf-page-header h2{font-family:'Noto Serif JP',serif;font-size:15px;font-weight:700;color:#1a1a2e;margin:0}
+.pdf-page-header span{font-size:10px;color:#9090b0}
+
+/* 본문 + 세로줄 + 카드 레이아웃 */
+.pdf-body-wrap{display:flex;gap:0;align-items:flex-start;width:100%}
+.pdf-text-col{flex:1;min-width:0;font-family:'Noto Serif JP',serif;font-size:11.5px;line-height:2.0;color:#1a1a2e;text-align:justify;padding-right:16px;border-right:1.5px solid #ddd8cc;box-sizing:border-box}
+.pdf-text-col p{margin:0 0 11px 0;text-indent:1em}
+.pdf-text-col p:last-child{margin-bottom:0}
+.pdf-chapter-hdr{font-weight:700;font-size:11.5px;border-bottom:1px solid #eee;padding:6px 0 3px;font-family:'Noto Sans KR',sans-serif;color:#1a1a2e;margin-bottom:8px}
+.pdf-empty-line{height:13px}/* 1em 공백 */
+.pdf-hl{border-radius:2px;padding:0 1px;font-weight:500}
+.pdf-hl-dup{padding-bottom:1px}
+/* PDF 품사별 */
+.pdf-hl.pos-verb{background:#fde68a}
+.pdf-hl-dup.pos-verb{border-bottom:2px solid #fde68a}
+.pdf-hl.pos-noun{background:#bae6fd}
+.pdf-hl-dup.pos-noun{border-bottom:2px solid #bae6fd}
+.pdf-hl.pos-iadj{background:#bbf7d0}
+.pdf-hl-dup.pos-iadj{border-bottom:2px solid #bbf7d0}
+.pdf-hl.pos-nadj{background:#e9d5ff}
+.pdf-hl-dup.pos-nadj{border-bottom:2px solid #e9d5ff}
+.pdf-hl.pos-adv{background:#fed7aa}
+.pdf-hl-dup.pos-adv{border-bottom:2px solid #fed7aa}
+.pdf-hl.pos-other{background:#e2e8f0}
+.pdf-hl-dup.pos-other{border-bottom:2px solid #e2e8f0}
+
+/* 사이드 단어 카드 컬럼 */
+.pdf-card-col{flex:0 0 185px;padding-left:12px;display:flex;flex-direction:column;gap:4px;box-sizing:border-box}
+.pdf-word-card{border:1px solid #e0e0e0;border-left:3px solid #ccc;padding:3px 5px 3px 6px;background:#fafafa;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.06);box-sizing:border-box;width:100%}
+.pdf-wc-word{font-family:'Noto Serif JP',serif;font-size:10px;font-weight:700;color:#1a1a2e;line-height:1.2}
+.pdf-wc-read{font-size:6.5px;color:#1a3d6d;font-family:'Noto Serif JP',serif;margin-top:1px}
+.pdf-wc-pos{display:inline-block;font-size:6px;background:#dbeafe;color:#1a3d6d;padding:1px 2px;border-radius:3px;margin-left:2px;vertical-align:middle}
+.pdf-wc-mean{font-size:7px;color:#1a1a2e;font-weight:500;margin-top:1px}
+.pdf-wc-kanji{font-size:6px;color:#9090b0;margin-top:1px;line-height:1.4}
+
+.pdf-page-footer{border-top:1px solid #eee8dc;margin-top:24px;padding-top:8px;display:flex;justify-content:space-between;font-size:9px;color:#9090b0}
+@media(max-width:860px){.pdf-page{width:100%}}
+
+#toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--ink);color:white;padding:8px 18px;border-radius:20px;font-size:12px;opacity:0;transition:all .3s;z-index:4000;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>EPUB <em>日</em>本語 단어장</h1>
+  <div id="hd-right">
+    <div id="hd-meta"><span id="hd-title">—</span></div>
+    <span id="hd-count">0개</span>
+    <button id="orient-btn" title="가로/세로 전환" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1">⇄</button>
+    <button id="storage-btn" title="데이터 관리">💾</button>
+  </div>
+</header>
+
+<div id="top-bar">
+  <div class="tf" style="gap:4px;flex-wrap:nowrap">
+    <label style="font-size:10px;color:var(--ink-f);white-space:nowrap;font-weight:500">🔑</label>
+    <input type="text" id="api-inline-input" placeholder="API 키 붙여넣기" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="off"
+      style="width:160px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:monospace;background:var(--paper);color:var(--ink)">
+    <button id="api-inline-save" style="padding:4px 9px;background:var(--ink);color:white;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">저장</button>
+    <button id="api-manage-btn" style="padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:white;font-size:11px;cursor:pointer;color:var(--ink-l);white-space:nowrap">⚙</button>
+    <span id="api-status"></span>
+  </div>
+  <div class="tsep"></div>
+  <div class="tf">
+    <label>📖 파일</label>
+    <span id="epub-filename" style="font-size:11px;color:var(--ink-l);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+  </div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+    <label style="font-size:10px;color:var(--ink-f);white-space:nowrap;font-weight:500">🤖</label>
+    <input type="text" id="model-input"
+      style="width:170px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:monospace;background:var(--paper);color:var(--ink)"
+      autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">
+  </div>
+</div>
+
+<div class="main">
+  <!-- LEFT: Vocab/Input -->
+  <div class="vocab-panel">
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="draw-tab">✏️ 입력</button>
+      <button class="tab-btn" data-tab="list-tab">📚 단어장</button>
+    </div>
+
+    <!-- 입력 탭 -->
+    <div class="tab-content active" id="draw-tab">
+      <div class="draw-inner">
+        <!-- 왼쪽: 선택 단어 패널 -->
+        <div class="draw-left">
+          <!-- EPUB 선택 단어 패널 -->
+          <div id="sel-word-panel">
+            <div style="font-size:10px;color:var(--ink-f);font-weight:500;letter-spacing:1px;text-transform:uppercase">선택한 단어</div>
+            <div id="sel-word-display"></div>
+            <div id="sel-sentence-display"></div>
+            <div class="sel-panel-btns">
+              <button class="btn primary" id="sel-lookup-btn" style="font-size:11px">🔍 뜻 검색</button>
+              <button class="btn" id="sel-direct-btn" style="font-size:11px">＋ 바로 추가</button>
+              <button class="btn" id="sel-cancel-btn" style="flex:0.4;font-size:12px;color:var(--ink-f)">✕</button>
+            </div>
+          </div>
+
+          <!-- 상태 메시지 -->
+          <div id="status"></div>
+
+          <!-- 검색 기록 -->
+          <div id="search-history-wrap" style="display:none">
+            <div class="sh-label">최근 검색</div>
+            <div id="search-history"></div>
+          </div>
+        </div>
+
+        <!-- 오른쪽: 검색 결과 -->
+        <div class="draw-right">
+          <div style="font-size:10px;color:var(--ink-f);font-weight:500;letter-spacing:1px;text-transform:uppercase">검색 결과</div>
+          <div id="result-area">
+            <div class="res-empty">단어를 입력하거나<br>EPUB 텍스트를<br>드래그하세요.</div>
+          </div>
+          <div id="add-btn-wrap">
+            <button class="btn accent" id="add-btn" style="width:100%">＋ 단어장에 추가</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 단어장 탭 -->
+    <div class="tab-content" id="list-tab">
+      <div class="vlist-header">
+        <div style="display:flex;align-items:center;gap:7px">
+          <span style="font-size:10px;color:var(--ink-f);font-weight:500;letter-spacing:1px;text-transform:uppercase">단어장</span>
+          <span class="v-badge" id="count-badge">0</span>
+        </div>
+        <div class="exp-row">
+          <button class="exp-btn batch" id="batch-lookup-btn" style="display:none">🔍 일괄 검색</button>
+          <button class="exp-btn" id="export-tsv-btn">↓ TSV</button>
+          <button class="exp-btn" id="export-xlsx-btn">↓ Excel</button>
+          <button class="exp-btn pdf" id="export-pdf-btn">↓ PDF</button>
+        </div>
+      </div>
+      <div id="vocab-list">
+        <div class="vempty"><span class="big">空</span>아직 단어가 없습니다.</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- RIGHT: EPUB -->
+  <div class="epub-panel">
+    <div class="epub-toolbar">
+      <span class="ep-label">EPUB</span>
+      <button id="epub-file-btn">📂 열기</button>
+      <input type="file" id="epub-file-input" accept=".epub">
+      <button class="enav" id="toc-btn" disabled>☰</button>
+      <button class="enav" id="prev-btn" disabled>‹</button>
+      <span id="epub-page-info">—</span>
+      <button class="enav" id="next-btn" disabled>›</button>
+      <button class="efont" id="font-dn">A-</button>
+      <button class="efont" id="font-up">A+</button>
+      <span style="width:1px;height:16px;background:var(--border);flex-shrink:0"></span>
+      <button class="efont active" id="align-left-btn" title="왼쪽 정렬"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="1" width="14" height="1.5" rx=".75" fill="currentColor"/><rect x="0" y="4.5" width="9" height="1.5" rx=".75" fill="currentColor"/><rect x="0" y="8" width="14" height="1.5" rx=".75" fill="currentColor"/><rect x="0" y="11.5" width="9" height="1.5" rx=".75" fill="currentColor"/></svg></button>
+      <button class="efont" id="align-justify-btn" title="양쪽 정렬"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="1" width="14" height="1.5" rx=".75" fill="currentColor"/><rect x="0" y="4.5" width="14" height="1.5" rx=".75" fill="currentColor"/><rect x="0" y="8" width="14" height="1.5" rx=".75" fill="currentColor"/><rect x="0" y="11.5" width="14" height="1.5" rx=".75" fill="currentColor"/></svg></button>
+      <span style="width:1px;height:16px;background:var(--border);flex-shrink:0"></span>
+      <button class="efont active" id="theme-white-btn" title="흰 배경" style="background:#fff;color:#555">白</button>
+      <button class="efont" id="theme-sepia-btn" title="미색 배경" style="background:#f5f0e8;color:#7a5800">米</button>
+      <button class="efont" id="theme-dark-btn" title="다크 모드" style="background:#1e1e2e;color:#cdd6f4">夜</button>
+      <button class="efont" id="hl-btn" title="단어장 하이라이트 적용" style="margin-left:auto;background:#ffe066;border-color:#f5c800;color:#7a5800;font-weight:500">🖊 하이라이트</button>
+    </div>
+    <div class="epub-inner">
+      <div id="toc-panel"><h3>목차</h3><div id="toc-list"></div></div>
+      <div id="epub-drop-zone">
+        <div class="drop-icon">📖</div>
+        <p>EPUB 파일을 드롭하거나<br><strong>열기</strong>를 눌러주세요.<br><br>
+        <span style="font-size:11px">텍스트를 드래그하면 단어 검색이 가능합니다.</span></p>
+      </div>
+      <div id="epub-reader"></div>
+    </div>
+  </div>
+</div>
+
+<!-- API 키 모달 -->
+<div class="modal-backdrop" id="api-modal-backdrop">
+  <div class="modal-box">
+    <h2>🔑 API 키 관리</h2>
+    <div id="api-key-list"></div>
+    <div class="api-add-row">
+      <input type="text" id="api-new-input" placeholder="AIza... (길게 눌러 붙여넣기)" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="off">
+      <button type="button" id="api-toggle-vis" style="padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:white;font-size:13px;cursor:pointer" title="보기/숨기기">👁</button><button id="api-add-btn">추가</button>
+    </div>
+    <div id="api-key-status-bar"></div>
+    <button class="modal-close" id="api-modal-close">닫기</button>
+  </div>
+</div>
+
+<!-- 저장소 모달 -->
+<div class="modal-backdrop" id="storage-modal-backdrop">
+  <div class="modal-box">
+    <h2>💾 저장 데이터 관리</h2>
+    <div class="sm-section">
+      <h3>📚 현재 단어장 <span id="sm-epub-name" style="font-weight:400;color:var(--ink)"></span></h3>
+      <div class="sm-row"><span class="sm-label">단어 수</span><span class="sm-value" id="sm-vocab-count">—</span></div>
+      <div class="sm-row"><span class="sm-label">용량</span><span class="sm-value" id="sm-vocab-size">—</span></div>
+      <div class="sm-row" style="gap:5px;flex-wrap:wrap">
+        <button class="sm-btn ok" id="sm-vocab-backup">⬇ JSON 저장</button>
+        <button class="sm-btn ok" id="sm-vocab-restore-btn">⬆ JSON 불러오기</button>
+        <input type="file" id="sm-vocab-restore-input" accept=".json" style="display:none">
+        <button class="sm-btn danger" id="sm-vocab-clear">이 단어장 삭제</button>
+      </div>
+    </div>
+    <div class="sm-section">
+      <h3>📂 저장된 EPUB 단어장</h3>
+      <div id="sm-all-vocabs" style="display:flex;flex-direction:column;gap:4px;max-height:140px;overflow-y:auto"></div>
+    </div>
+    <div class="sm-section">
+      <h3>📖 읽기 위치 기록</h3>
+      <div class="sm-progress-list" id="sm-progress-list"></div>
+      <div class="sm-row" style="margin-top:4px">
+        <button class="sm-btn danger" id="sm-progress-clear-all">기록 전체 삭제</button>
+      </div>
+    </div>
+    <div class="sm-section">
+      <h3>🔑 API 키 / 💿 전체 용량</h3>
+      <div class="sm-row"><span class="sm-label">저장된 키</span><span class="sm-value" id="sm-api-count">—</span></div>
+      <div class="sm-row"><span class="sm-label">localStorage 사용</span><span class="sm-value" id="sm-total-size">—</span></div>
+      <div class="sm-row"><span class="sm-label" style="font-size:10px;color:var(--ink-f)">※ 브라우저마다 다름 (보통 5~10MB)</span></div>
+    </div>
+    <button class="modal-close" id="storage-modal-close">닫기</button>
+  </div>
+</div>
+
+<div id="pdf-preview-backdrop">
+  <div id="pdf-preview-modal">
+    <div id="pdf-preview-toolbar">
+      <span class="toolbar-title">📄 PDF 미리보기 — 본문 + 단어장</span>
+      <span id="pdf-progress-msg"></span>
+      <button id="pdf-close-btn">✕ 닫기</button>
+      <button id="pdf-download-btn">⬇ PDF 다운로드</button>
+    </div>
+    <div id="pdf-pages-wrap"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════ */
+const VOCAB_PREFIX   = 'epub_vocab_';        // epub_vocab_[파일명]
+const HL_STORAGE_KEY = 'epub_highlights_v1'; // { filename: [word, ...] }
+
+/* ═══════════════════════════════════════
+   품사 정규화 (일본어 사전 기준 → 한국어 표기)
+═══════════════════════════════════════ */
+const POS_MAP = [
+  // 동사
+  { css:'pos-verb',  label:'동사',    re:/動詞|どうし|verb|する動詞|동사|vt\b|vi\b|v\b/i },
+  // い형용사
+  { css:'pos-iadj',  label:'い형용사', re:/い形容詞|イ形容詞|い形|イ形|형용사.*い|い.*형용사|i.adj|iadj|イ形容詞|い형용사/i },
+  // な형용사
+  { css:'pos-nadj',  label:'な형용사', re:/な形容詞|ナ形容詞|な形|ナ形|형용사.*な|な.*형용사|na.adj|nadj|な형용사|形容動詞/i },
+  // 명사
+  { css:'pos-noun',  label:'명사',    re:/名詞|めいし|noun|명사|n\b/i },
+  // 부사
+  { css:'pos-adv',   label:'부사',    re:/副詞|ふくし|adv|부사/i },
+  // 접속사
+  { css:'pos-other', label:'접속사',  re:/接続詞|접속사|conj/i },
+  // 조사
+  { css:'pos-other', label:'조사',    re:/助詞|じょし|particle|조사/i },
+  // 조동사
+  { css:'pos-other', label:'조동사',  re:/助動詞|조동사|aux/i },
+  // 감탄사
+  { css:'pos-other', label:'감탄사',  re:/感動詞|감탄사|interj/i },
+  // 접두어
+  { css:'pos-other', label:'접두어',  re:/接頭|접두/i },
+  // 접미어
+  { css:'pos-other', label:'접미어',  re:/接尾|접미|suffix/i },
+  // 관용구
+  { css:'pos-other', label:'관용구',  re:/慣用|관용|idiom|phrase/i },
+];
+
+/**
+ * API 반환 품사 문자열 → { label: '한국어품사명', css: 'pos-xxx' }
+ * 매칭 안 되면 label=원문(있으면), css='pos-other'
+ */
+function normalizePos(raw) {
+  if (!raw) return { label:'', css:'pos-other' };
+  const s = raw.trim();
+  for (const entry of POS_MAP) {
+    if (entry.re.test(s)) return { label: entry.label, css: entry.css };
+  }
+  // 이미 한국어 표준 품사면 그대로 (css는 label로 재매칭)
+  return { label: s || '', css: 'pos-other' };
+}
+
+/** vocab entry → pos CSS class */
+function posCss(v) {
+  return normalizePos(v.part_of_speech).css;
+}
+/** vocab entry → pos 한국어 label */
+function posLabel(v) {
+  return normalizePos(v.part_of_speech).label;
+}
+
+/* ═══════════════════════════════════════
+   활용형 → 원형 변환 (일본어 동사/형용사)
+═══════════════════════════════════════ */
+/**
+ * 입력 텍스트에서 활용형을 탐색해 원형과 활용형 모두 반환.
+ * Gemini 프롬프트에 활용형 힌트를 포함시켜 원형 추론을 돕는다.
+ * 실제 활용→원형 변환은 Gemini에 위임 (lookup 시 프롬프트에 주입).
+ */
+function buildLookupPrompt(word, sourceSentence) {
+  const base = SYSTEM_PROMPT;
+  const inflHint = `
+중요: 입력 단어는 활용형일 수 있습니다. 반드시 사전형(원형)으로 변환해서 "word" 필드에 넣으세요.
+예) 空らした→空らす, 届いた→届く, 食べている→食べる, 高かった→高い, 静かだった→静かだ
+출처문장이 있으면 문맥을 참고해 활용형을 정확히 원형으로 복원하세요.`;
+  if (sourceSentence) {
+    return base + inflHint + `\n\n단어(활용형 가능): ${word}\n출처문장: ${sourceSentence}`;
+  }
+  return base + inflHint + `\n\n단어(활용형 가능): ${word}`;
+}
+
+function vocabKey(name) {
+  return VOCAB_PREFIX + (name || currentEpubFilename || '__global__');
+}
+let MODEL = localStorage.getItem('gemini_model') || 'gemini-2.5-flash';
+const SYSTEM_PROMPT  = `You are a Japanese vocabulary assistant.
+Return ONLY a valid JSON object — no markdown, no code fences:
+{"word":"단어원형","reading":"히라가나읽기","meaning":"한국어뜻(2-4단어)","part_of_speech":"품사","source_sentence_reading":"출처문장히라가나(있으면)","kanji_breakdown":[{"char":"한자1","reading":"읽기(음독/훈독)","meaning":"한국어뜻"}]}
+- kanji_breakdown: 단어에 한자가 포함된 경우만. 순수 히라가나/가타카나 단어는 빈 배열 [].
+- 각 한자의 대표 읽기 1가지(단어 내 실제 읽기 우선)와 한국식 훈음 표기(예: 읽을 독, 쓸 서, 물 수). "읽다" "쓰다" 형태 말고 반드시 "읽을 독" "쓸 서" 형태로.
+인식불가: {"error":"인식 불가"}`;
+
+/* ═══════════════════════════════════════
+   TOAST
+═══════════════════════════════════════ */
+function showToast(msg, dur=2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+/* ═══════════════════════════════════════
+   API KEY STORE
+═══════════════════════════════════════ */
+function loadApiStore() { try { return JSON.parse(localStorage.getItem('gemini_api_keys_v2')||'null'); } catch(_){return null;} }
+function saveApiStore(s) { localStorage.setItem('gemini_api_keys_v2', JSON.stringify(s)); }
+let apiStore = loadApiStore();
+if (!apiStore) {
+  const leg = localStorage.getItem('gemini_api_key');
+  apiStore = { keys: leg?[{id:1,label:leg.slice(0,8)+'…'+leg.slice(-4),value:leg}]:[], activeId:leg?1:null };
+  saveApiStore(apiStore);
+}
+function getActiveKey() { if(!apiStore.activeId)return''; return apiStore.keys.find(k=>k.id===apiStore.activeId)?.value||''; }
+
+/* ═══════════════════════════════════════
+   GEMINI API
+═══════════════════════════════════════ */
+// 모델별 thinking 최소화 설정 (단어 검색엔 추론이 필요 없음 → 지연 대폭 감소)
+function thinkingConfigFor(model) {
+  const m = model.toLowerCase();
+  if (/2\.5-pro/.test(m)) return { thinkingBudget: 128 };   // Pro는 0 불가, 최소값
+  if (/2\.5/.test(m))     return { thinkingBudget: 0 };     // Flash / Flash-Lite: 끄기
+  if (/gemini-3/.test(m))  return { thinkingLevel: 'low' };  // 3.x 계열
+  return null;
+}
+// 모델이 거부한 옵션은 기억해두고 다음부터 빼고 보냄
+const unsupportedOpts = new Set(JSON.parse(localStorage.getItem('gemini_unsupported_opts')||'[]'));
+function markUnsupported(k){ unsupportedOpts.add(k); localStorage.setItem('gemini_unsupported_opts', JSON.stringify([...unsupportedOpts])); }
+
+async function callGeminiWithKey(parts, key) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
+  const build = () => {
+    const gc = { temperature: 0.1 };
+    if (!unsupportedOpts.has(MODEL+':json')) gc.responseMimeType = 'application/json';
+    const tc = thinkingConfigFor(MODEL);
+    if (tc && !unsupportedOpts.has(MODEL+':thinking')) gc.thinkingConfig = tc;
+    return JSON.stringify({ contents:[{parts}], generationConfig: gc });
+  };
+  for (let i = 0; i < 3; i++) {
+    const resp = await fetch(url, { method:'POST', mode:'cors', headers:{'Content-Type':'application/json'}, body: build() });
+    if (resp.status !== 400) return resp;
+    // 400이면 어떤 옵션 때문인지 보고 빼고 재시도
+    let msg = '';
+    try { msg = JSON.stringify(await resp.clone().json()); } catch(_) {}
+    if (/thinking/i.test(msg) && !unsupportedOpts.has(MODEL+':thinking')) { markUnsupported(MODEL+':thinking'); continue; }
+    if (/mime|json/i.test(msg) && !unsupportedOpts.has(MODEL+':json'))   { markUnsupported(MODEL+':json'); continue; }
+    return resp;
+  }
+}
+
+/* 429 응답 분석: 분당 한도(잠깐 기다리면 풀림) vs 일일 한도(오늘은 끝) */
+function parseRateLimit(j) {
+  const details = j?.error?.details || [];
+  let retrySec = 0, perDay = false;
+  details.forEach(d => {
+    const t = d['@type'] || '';
+    if (t.includes('RetryInfo') && d.retryDelay) retrySec = parseFloat(d.retryDelay) || 0;
+    if (t.includes('QuotaFailure')) (d.violations||[]).forEach(v => {
+      if (/PerDay/i.test(v.quotaId||'') || /per.?day/i.test(v.quotaMetric||'')) perDay = true;
+    });
+  });
+  const msg = j?.error?.message || '';
+  if (/per.?day|daily/i.test(msg)) perDay = true;
+  return { retrySec, perDay, msg };
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function callGemini(parts) {
+  if (!apiStore.keys.length) throw new Error('API 키 없음. 상단에서 추가해주세요.');
+
+  const activeIdx = apiStore.keys.findIndex(k => k.id === apiStore.activeId);
+  const startIdx  = activeIdx >= 0 ? activeIdx : 0;
+  const ordered   = [...apiStore.keys.slice(startIdx), ...apiStore.keys.slice(0, startIdx)];
+
+  const MAX_ROUNDS   = 3;    // 모든 키를 한 바퀴 도는 횟수
+  const MAX_WAIT_SEC = 60;   // 분당 한도 대기 상한
+  const dayLimited = new Set();
+  let lastError = '';
+
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    let minWait = Infinity;   // 이번 바퀴에서 가장 빨리 풀리는 키의 대기시간
+
+    for (const keyObj of ordered) {
+      if (dayLimited.has(keyObj.id)) continue;
+
+      let resp;
+      try { resp = await callGeminiWithKey(parts, keyObj.value); }
+      catch(e) { lastError = '네트워크 오류: ' + e.message; minWait = Math.min(minWait, 2); continue; }
+
+      if (resp.status === 429) {
+        let j = null; try { j = await resp.json(); } catch(_) {}
+        const rl = parseRateLimit(j);
+        if (rl.perDay) {
+          dayLimited.add(keyObj.id);
+          lastError = `${keyObj.label}: 오늘 한도 소진 (${MODEL})`;
+          showToast(`⚠ ${keyObj.label} 일일 한도 소진, 다음 키...`, 1500);
+        } else {
+          lastError = `${keyObj.label}: 분당 한도 초과`;
+          minWait = Math.min(minWait, rl.retrySec || 10);
+        }
+        continue;
+      }
+      if (resp.status === 503 || resp.status === 529 || resp.status === 500) {
+        lastError = `서버 과부하 (${resp.status})`;
+        minWait = Math.min(minWait, 2 + round * 2);
+        continue;
+      }
+      if (resp.status === 403) {
+        lastError = `${keyObj.label}: 403 접근 불가 (키 확인 필요)`;
+        dayLimited.add(keyObj.id);
+        continue;
+      }
+      if (!resp.ok) {
+        let m = 'HTTP ' + resp.status;
+        try { const j = await resp.json(); m = j.error?.message || m; } catch(_) {}
+        throw new Error(m);
+      }
+
+      const data = await resp.json();
+      const candidate = data.candidates?.[0];
+      if (!candidate || candidate.finishReason === 'OTHER') {
+        const br = data.promptFeedback?.blockReason;
+        if (br) throw new Error('차단됨: ' + br);
+        lastError = '빈 응답'; minWait = Math.min(minWait, 1); continue;
+      }
+
+      if (apiStore.activeId !== keyObj.id) {
+        apiStore.activeId = keyObj.id; saveApiStore(apiStore); updateApiStatus();
+        showToast(`🔑 키 전환: ${keyObj.label}`);
+      }
+      return (candidate.content?.parts?.[0]?.text||'').replace(/^```[\w]*\n?/,'').replace(/\n?```$/,'').trim();
+    }
+
+    // 모든 키가 일일 한도면 기다려도 소용없음
+    if (dayLimited.size >= ordered.length) break;
+    if (round < MAX_ROUNDS - 1 && minWait <= MAX_WAIT_SEC) {
+      for (let t = Math.ceil(minWait); t > 0; t--) {
+        setStatus(`⏳ 한도 대기 중... ${t}초 후 재시도 (${round+1}/${MAX_ROUNDS-1})`);
+        await sleep(1000);
+      }
+    }
+  }
+
+  const hint = dayLimited.size >= ordered.length
+    ? ' — 다른 모델(예: gemini-2.5-flash-lite)로 바꿔보세요.' : '';
+  throw new Error('모든 키 실패. ' + lastError + hint);
+}
+
+/* ═══════════════════════════════════════
+   VOCAB STORE
+═══════════════════════════════════════ */
+let vocab = [];
+function saveVocab() {
+  if (!currentEpubFilename) return;
+  const data = { epub: currentEpubFilename, words: vocab, savedAt: Date.now() };
+  localStorage.setItem(vocabKey(), JSON.stringify(data));
+}
+function loadVocab() {
+  if (!currentEpubFilename) { vocab = []; return; }
+  try {
+    const raw = localStorage.getItem(vocabKey());
+    if (!raw) { vocab = []; return; }
+    const data = JSON.parse(raw);
+    // 새 포맷 { epub, words } 또는 구버전 배열 모두 처리
+    vocab = Array.isArray(data) ? data : (data.words || []);
+  } catch(_) { vocab = []; }
+}
+function isDup(word) { return vocab.some(v=>v.word===word); }
+function addToVocab(entry) {
+  if (isDup(entry.word)) return false;
+  vocab.push({...entry, epub:currentEpubFilename||'', addedAt:Date.now()});
+  saveVocab(); renderVocab(); return true;
+}
+// EPUB 파일 전환 시 단어장 전환
+function switchVocab() {
+  loadVocab();
+  renderVocab();
+}
+// 저장된 모든 EPUB 단어장 목록
+function allVocabKeys() {
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(VOCAB_PREFIX)) keys.push(k);
+  }
+  return keys;
+}
+
+/* ═══════════════════════════════════════
+   HIGHLIGHT STORE  { filename → Set<word> }
+═══════════════════════════════════════ */
+let hlStore = {};
+function loadHlStore() { try{hlStore=JSON.parse(localStorage.getItem(HL_STORAGE_KEY)||'{}');}catch(_){hlStore={};} }
+function saveHlStore() { localStorage.setItem(HL_STORAGE_KEY, JSON.stringify(hlStore)); }
+loadHlStore();
+function addHighlight(word) {
+  if (!currentEpubFilename) return;
+  if (!hlStore[currentEpubFilename]) hlStore[currentEpubFilename] = [];
+  if (!hlStore[currentEpubFilename].includes(word)) {
+    hlStore[currentEpubFilename].push(word);
+    saveHlStore();
+  }
+}
+function removeHighlight(word) {
+  if (!currentEpubFilename || !hlStore[currentEpubFilename]) return;
+  hlStore[currentEpubFilename] = hlStore[currentEpubFilename].filter(w=>w!==word);
+  saveHlStore();
+}
+function getHighlights() { return hlStore[currentEpubFilename] || []; }
+
+// EPUB 텍스트에 하이라이트 적용 (첫 등장: 배경, 중복: 같은 색 밑줄)
+function applyHighlights() {
+  loadHlStore();
+  const wordSet = new Set(getHighlights());
+  vocab.forEach(v => {
+    if (v.word) wordSet.add(v.word);
+    if (v.sel_text) wordSet.add(v.sel_text);
+  });
+  // 긴 단어 우선 매칭 (예: 食べる가 食べ보다 먼저)
+  const words = [...wordSet].filter(Boolean).sort((a,b)=>b.length-a.length);
+
+  epubReader.querySelectorAll('.epub-hl, .epub-hl-dup').forEach(span => {
+    span.replaceWith(document.createTextNode(span.textContent));
+  });
+  epubReader.normalize();
+
+  if (!words.length) return;
+
+  // word → pos CSS class 매핑 (단어장 기준)
+  const wordPosMap = {};
+  vocab.forEach(v => {
+    const pc = posCss(v);
+    if (v.word) wordPosMap[v.word] = pc;
+    if (v.sel_text && v.sel_text !== v.word) wordPosMap[v.sel_text] = pc;
+  });
+
+  // 매칭 문자열 → 대표 단어(사전형). 활용형과 원형을 같은 단어로 취급
+  const canonOf = {};
+  words.forEach(w => canonOf[w] = w);
+  vocab.forEach(v => {
+    if (v.word) canonOf[v.word] = v.word;
+    if (v.sel_text) canonOf[v.sel_text] = v.word || v.sel_text;
+  });
+  // 대표 단어별로 책 전체에서 처음 등장하는 챕터 번호
+  const firstSpine = {};
+  const spineTexts = epubSpines.map(sp => {
+    if (sp._text == null) sp._text = new DOMParser().parseFromString(sp.rawHtml, 'text/html').body.textContent || '';
+    return sp._text;
+  });
+  words.forEach(w => {
+    const c = canonOf[w];
+    for (let i = 0; i < spineTexts.length; i++) {
+      if (i >= (firstSpine[c] ?? Infinity)) break;
+      if (spineTexts[i].includes(w)) { firstSpine[c] = i; break; }
+    }
+  });
+  // 앞 챕터에서 이미 나온 단어는 이 챕터에선 처음부터 '중복'(밑줄)
+  const seenWords = new Set();
+  Object.keys(firstSpine).forEach(c => { if (firstSpine[c] < currentSpine) seenWords.add(c); });
+
+  const escaped = words.map(w => w.replace(/[-[\]{}()*+?.,\\^$|#]/g,'\\$&'));
+
+  const walker = document.createTreeWalker(epubReader, NodeFilter.SHOW_TEXT, {
+    acceptNode: n => (n.parentElement.closest('.epub-hl') || n.parentElement.closest('.epub-hl-dup'))
+      ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+  });
+  const textNodes = [];
+  let n;
+  while ((n = walker.nextNode())) textNodes.push(n);
+
+  const re = new RegExp('(' + escaped.join('|') + ')', 'g');
+  textNodes.forEach(tn => {
+    const txt = tn.textContent;
+    re.lastIndex = 0;
+    if (!re.test(txt)) return;
+    re.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let last = 0, m;
+    while ((m = re.exec(txt)) !== null) {
+      if (m.index > last) frag.appendChild(document.createTextNode(txt.slice(last, m.index)));
+      const span = document.createElement('span');
+      const canon = canonOf[m[1]] || m[1];
+      const isFirst = !seenWords.has(canon);
+      seenWords.add(canon);
+      const pc = wordPosMap[m[1]] || 'pos-other';
+      span.className = (isFirst ? 'epub-hl' : 'epub-hl-dup') + ' ' + pc;
+      span.dataset.word = m[1];
+      span.textContent = m[1];
+      frag.appendChild(span);
+      last = m.index + m[1].length;
+    }
+    if (last < txt.length) frag.appendChild(document.createTextNode(txt.slice(last)));
+    tn.parentNode.replaceChild(frag, tn);
+  });
+}
+function highlightVocabCard(word) {
+  const list = document.getElementById('vocab-list');
+  // vcard에 data-word 속성이 없으므로 vc-word 텍스트와 vocab 원본으로 매칭
+  const cards = list.querySelectorAll('.vcard');
+  cards.forEach(card => {
+    const delBtn = card.querySelector('.vc-del');
+    const origIdx = delBtn ? +delBtn.dataset.i : -1;
+    const v = origIdx >= 0 ? vocab[origIdx] : null;
+    if (!v) return;
+    if (v.word === word || v.sel_text === word) {
+      card.style.borderColor = 'var(--blue)';
+      card.style.background  = 'var(--blue-bg)';
+      card.scrollIntoView({behavior:'smooth', block:'nearest'});
+      setTimeout(() => { card.style.borderColor=''; card.style.background=''; }, 2000);
+    }
+  });
+}
+
+/* ═══════════════════════════════════════
+   BATCH LOOKUP — 뜻 미입력 단어를 묶어서 한 번에 검색
+═══════════════════════════════════════ */
+const PENDING_MEANING = '(뜻 미입력)';
+const BATCH_SIZE = 15;
+let batchRunning = false;
+function isPending(v) { return v.meaning === PENDING_MEANING || !v.meaning; }
+
+function updateBatchBtn() {
+  const btn = document.getElementById('batch-lookup-btn');
+  if (!btn || batchRunning) return;
+  const n = vocab.filter(isPending).length;
+  btn.style.display = n ? '' : 'none';
+  btn.textContent = `🔍 일괄 검색 (${n})`;
+}
+
+function buildBatchPrompt(items) {
+  return `You are a Japanese vocabulary assistant.
+아래 단어 목록 각각에 대해 사전 정보를 만들어 주세요.
+Return ONLY a valid JSON array — no markdown, no code fences. 입력과 같은 순서, 같은 "i" 값을 유지:
+[{"i":0,"word":"사전형(원형)","reading":"히라가나읽기","meaning":"한국어뜻(2-4단어)","part_of_speech":"품사","source_sentence_reading":"출처문장히라가나(있으면)","kanji_breakdown":[{"char":"한자","reading":"읽기","meaning":"훈음"}]}]
+규칙:
+- 입력 단어는 활용형일 수 있음. 출처문장 문맥을 보고 반드시 사전형으로 복원해 "word"에 넣을 것. 예) 届いた→届く, 食べている→食べる, 高かった→高い
+- kanji_breakdown: 한자가 있을 때만, 없으면 []. 각 한자의 단어 내 실제 읽기 1개, meaning은 "읽을 독" "물 수" 같은 한국식 훈음 형태.
+- 인식 불가한 항목은 {"i":번호,"error":"인식 불가"}
+
+입력:
+${JSON.stringify(items.map(x => ({ i: x.i, word: x.word, sentence: x.sentence || '' })))}`;
+}
+
+function parseJsonArray(raw) {
+  try { const a = JSON.parse(raw); if (Array.isArray(a)) return a; if (Array.isArray(a?.items)) return a.items; } catch(_) {}
+  const m = raw.match(/\[[\s\S]*\]/);
+  if (m) { try { return JSON.parse(m[0]); } catch(_) {} }
+  throw new Error('응답 파싱 실패: ' + raw.slice(0, 60));
+}
+
+/* 검색 결과 하나를 단어장 항목에 반영. 반환: 'updated' | 'merged' | 'failed' */
+function applyBatchResult(entry, r) {
+  if (!r || r.error || !r.word) return 'failed';
+  const orig = entry.sel_text || entry.word;
+  // 원형으로 바꿨더니 이미 단어장에 있는 단어 → 미검색 항목은 지우고 하이라이트만 유지
+  const existing = vocab.find(v => v !== entry && v.word === r.word);
+  if (existing) {
+    vocab.splice(vocab.indexOf(entry), 1);
+    addHighlight(orig);
+    return 'merged';
+  }
+  Object.assign(entry, {
+    word: r.word,
+    reading: r.reading || '',
+    meaning: r.meaning || '',
+    part_of_speech: r.part_of_speech || '',
+    source_sentence_reading: r.source_sentence_reading || '',
+    kanji_breakdown: Array.isArray(r.kanji_breakdown) ? r.kanji_breakdown : [],
+    sel_text: orig,
+  });
+  addHighlight(r.word);
+  addHighlight(orig);
+  if (typeof cachePut === 'function') cachePut(orig, entry.source_sentence || '', r);
+  return 'updated';
+}
+
+async function runBatchLookup() {
+  if (batchRunning) return;
+  const pending = vocab.filter(isPending);
+  if (!pending.length) { showToast('검색할 단어가 없습니다.'); return; }
+  if (!apiStore.keys.length) { alert('API 키를 먼저 추가해주세요.'); return; }
+
+  const btn = document.getElementById('batch-lookup-btn');
+  batchRunning = true; btn.disabled = true;
+  const total = pending.length;
+  let done = 0, updated = 0, merged = 0, failed = 0;
+  const t0 = performance.now();
+
+  try {
+    for (let start = 0; start < pending.length; start += BATCH_SIZE) {
+      const chunk = pending.slice(start, start + BATCH_SIZE);
+      btn.innerHTML = `<span class="spinner"></span> ${done}/${total}`;
+      const items = chunk.map((v, i) => ({ i, word: v.sel_text || v.word, sentence: v.source_sentence || '' }));
+      const raw = await callGemini([{ text: buildBatchPrompt(items) }]);
+      const arr = parseJsonArray(raw);
+      const byI = {};
+      arr.forEach((r, k) => { byI[r?.i ?? k] = r; });
+      chunk.forEach((entry, i) => {
+        const res = applyBatchResult(entry, byI[i]);
+        if (res === 'updated') updated++; else if (res === 'merged') merged++; else failed++;
+      });
+      done += chunk.length;
+      saveVocab();     // 청크마다 저장 → 중간에 실패해도 앞부분은 보존
+      renderVocab();
+    }
+    const sec = ((performance.now() - t0) / 1000).toFixed(1);
+    const parts = [`${updated}개 완료`];
+    if (merged) parts.push(`${merged}개 기존 단어와 합침`);
+    if (failed) parts.push(`${failed}개 인식 실패`);
+    showToast(`✓ ${parts.join(', ')} (${sec}초)`, 3000);
+    setStatus('');
+  } catch (err) {
+    showToast(`⚠ ${done}/${total}개까지 처리 후 중단: ${err.message}`, 4000);
+  } finally {
+    batchRunning = false; btn.disabled = false;
+    saveVocab(); renderVocab();
+    if (epubReader.classList.contains('active')) applyHighlights();
+  }
+}
+
+/* ═══════════════════════════════════════
+   RENDER VOCAB
+═══════════════════════════════════════ */
+function renderVocab() {
+  document.getElementById('count-badge').textContent = vocab.length;
+  document.getElementById('hd-count').textContent    = vocab.length+'개';
+  updateBatchBtn();
+  const list = document.getElementById('vocab-list');
+  if (!vocab.length) { list.innerHTML='<div class="vempty"><span class="big">空</span>아직 단어가 없습니다.</div>'; return; }
+  // 본문 등장 순 정렬 (원본 vocab 불변, 원본 인덱스 보존)
+  const sorted = sortVocabByEpubOrder(vocab).map(v => ({ v, origIdx: vocab.indexOf(v) }));
+  list.innerHTML = sorted.map(({ v, origIdx }) => {
+    const pl = posLabel(v), pc = posCss(v);
+    return `
+    <div class="vcard${isPending(v)?' pending':''}">
+      <div class="vc-word">${v.word}</div>
+      <div class="vc-body">
+        <div class="vc-read">${v.reading||''}${pl?`<span class="vc-pos" style="background:var(--${pc});color:#333">${pl}</span>`:''}
+        </div>
+        <div class="vc-mean">${v.meaning||''}</div>
+        ${v.kanji_breakdown&&v.kanji_breakdown.length?`<div class="vc-kanji">${v.kanji_breakdown.map(k=>k.char+(k.reading?'('+k.reading+')':'')+' '+k.meaning).join(' · ')}</div>`:''}
+        ${v.source_sentence?`<div class="vc-sent">${v.source_sentence.replace(new RegExp('('+v.word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','g'),'<em>$1</em>')}</div>`:''}
+      </div>
+      <button class="vc-del" data-i="${origIdx}">×</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.vc-del').forEach(btn => btn.addEventListener('click', () => {
+    const entry = vocab[+btn.dataset.i];
+    vocab.splice(+btn.dataset.i, 1);
+    saveVocab(); renderVocab();
+    if (entry?.word) { removeHighlight(entry.word); }
+    if (entry?.sel_text && entry.sel_text !== entry?.word) { removeHighlight(entry.sel_text); }
+    reapplyHighlights();
+  }));
+}
+renderVocab();
+
+function reapplyHighlights() {
+  applyHighlights();
+}
+
+/* ═══════════════════════════════════════
+   TABS
+═══════════════════════════════════════ */
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===id));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id===id));
+}
+document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
+
+/* ═══════════════════════════════════════
+   STATUS
+═══════════════════════════════════════ */
+function setStatus(msg, type='') { const el=document.getElementById('status'); el.textContent=msg; el.className=type; }
+
+/* ═══════════════════════════════════════
+   LOOKUP
+═══════════════════════════════════════ */
+let pendingResult = null;
+let pendingSourceSentence = '';
+let pendingSelText = ''; // 사용자가 실제 선택한 원문 텍스트 (활용형 등)
+let searchHistory = []; // [{word, reading, meaning, part_of_speech}]
+
+function addToHistory(parsed) {
+  searchHistory = searchHistory.filter(h => h.word !== parsed.word);
+  searchHistory.unshift({ word:parsed.word, reading:parsed.reading||'', meaning:parsed.meaning||'', part_of_speech:parsed.part_of_speech||'' });
+  if (searchHistory.length > 8) searchHistory.pop();
+  renderHistory();
+}
+function renderHistory() {
+  const wrap = document.getElementById('search-history-wrap');
+  const list = document.getElementById('search-history');
+  if (!searchHistory.length) { wrap.style.display='none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = searchHistory.map((h,i) => `
+    <div class="sh-item" data-i="${i}">
+      <div class="sh-word">${h.word}</div>
+      <div class="sh-info">
+        <div class="sh-reading">${h.reading}${h.part_of_speech ? ` · ${h.part_of_speech}` : ''}</div>
+        <div class="sh-meaning">${h.meaning}</div>
+      </div>
+    </div>`).join('');
+  list.querySelectorAll('.sh-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const h = searchHistory[+el.dataset.i];
+      // 기록 클릭 시 결과 패널에 다시 표시
+      showResult(h, '');
+    });
+  });
+}
+
+function showResult(parsed, sourceSentence='') {
+  pendingResult = parsed;
+  pendingSourceSentence = sourceSentence;
+  const dup = isDup(parsed.word);
+  // 품사 정규화
+  const pos = normalizePos(parsed.part_of_speech);
+  parsed._posLabel = pos.label;
+  parsed._posCss   = pos.css;
+  // 한자 분해 렌더링
+  const kbHtml = (() => {
+    const kb = parsed.kanji_breakdown;
+    if (!kb || !kb.length) return '';
+    return `<div class="res-kanji-breakdown">${
+      kb.map(k => `<div class="kanji-chip">
+        <div class="kanji-chip-char">${k.char}</div>
+        <div class="kanji-chip-read">${k.reading||''}</div>
+        <div class="kanji-chip-mean">${k.meaning||''}</div>
+      </div>`).join('')
+    }</div>`;
+  })();
+
+  document.getElementById('result-area').innerHTML = `
+    <div class="res-word">${parsed.word}</div>
+    <div class="res-reading">${parsed.reading||''}${pos.label?`<span class="res-pos" style="background:var(--${pos.css.replace('pos-','pos-')});color:#333">${pos.label}</span>`:''}</div>
+    <div class="res-meaning">${parsed.meaning||''}</div>
+    ${kbHtml}
+    ${sourceSentence?`<div class="res-ex">
+      <div class="ex-label">출처 문장</div>
+      <div class="ex-jp">${sourceSentence.replace(new RegExp('('+parsed.word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','g'),'<em>$1</em>')}</div>
+      ${parsed.source_sentence_reading?`<div style="font-size:10px;color:var(--blue);margin-top:2px">${parsed.source_sentence_reading}</div>`:''}
+    </div>`:''}`;
+  document.getElementById('add-btn-wrap').style.display = dup ? 'none' : 'block';
+  setStatus(dup ? `✓ "${parsed.word}"은(는) 이미 저장되어 있습니다.` : '검색 완료! 추가하세요.', 'ok');
+}
+
+/* 검색 결과 캐시: 같은 단어+문장은 API 호출 없이 즉시 표시 */
+const LOOKUP_CACHE_KEY = 'epub_lookup_cache_v1';
+const LOOKUP_CACHE_MAX = 500;
+let lookupCache = {};
+try { lookupCache = JSON.parse(localStorage.getItem(LOOKUP_CACHE_KEY)||'{}'); } catch(_) { lookupCache = {}; }
+function cacheKey(word, sent) { return word + '\u0001' + (sent||''); }
+function cacheGet(word, sent) { return lookupCache[cacheKey(word,sent)]?.d || null; }
+function cachePut(word, sent, data) {
+  lookupCache[cacheKey(word,sent)] = { d:data, t:Date.now() };
+  const keys = Object.keys(lookupCache);
+  if (keys.length > LOOKUP_CACHE_MAX) {
+    keys.sort((a,b)=>lookupCache[a].t-lookupCache[b].t)
+        .slice(0, keys.length-LOOKUP_CACHE_MAX).forEach(k=>delete lookupCache[k]);
+  }
+  try { localStorage.setItem(LOOKUP_CACHE_KEY, JSON.stringify(lookupCache)); } catch(_) {}
+}
+
+async function lookupWord(word, sourceSentence='', originalSelText='') {
+  switchTab('draw-tab');
+  const cached = cacheGet(word, sourceSentence);
+  if (cached) {
+    pendingSelText = originalSelText || word;
+    showResult({...cached}, sourceSentence);
+    addToHistory(cached);
+    setStatus('⚡ 캐시에서 불러옴', 'ok');
+    return;
+  }
+  const t0 = performance.now();
+  const btn = document.getElementById('sel-lookup-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 검색중'; }
+  document.getElementById('add-btn-wrap').style.display = 'none';
+  // 오른쪽에 로딩 표시
+  document.getElementById('result-area').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 0;gap:10px">
+      <div style="font-family:'Noto Serif JP',serif;font-size:26px;color:var(--ink);font-weight:700">${word}</div>
+      <div style="display:flex;align-items:center;gap:6px;color:var(--ink-f);font-size:12px">
+        <span class="spinner" style="border-top-color:var(--blue)"></span> 검색 중...
+      </div>
+    </div>`;
+  setStatus('');
+  try {
+    const prompt = buildLookupPrompt(word, sourceSentence);
+    const raw = await callGemini([{text: prompt}]);
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch(e) {
+      const m = raw.match(/\{[\s\S]*\}/);
+      try { parsed = JSON.parse(m ? m[0] : ''); } catch(_) { throw new Error('파싱 실패: '+raw.slice(0,60)); }
+    }
+    if (parsed.error) {
+      document.getElementById('result-area').innerHTML = `<div class="res-empty">인식 실패<br><small>${word}</small></div>`;
+      setStatus('인식 실패', 'error');
+    } else {
+      cachePut(word, sourceSentence, parsed);
+      pendingSelText = originalSelText || word; showResult(parsed, sourceSentence); addToHistory(parsed);
+      const sec = ((performance.now()-t0)/1000).toFixed(1);
+      setStatus(`검색 완료 (${sec}초)${isDup(parsed.word)?' — 이미 저장됨':''}`, 'ok');
+    }
+  } catch(err) { setStatus('오류: '+err.message, 'error'); }
+  if (btn) { btn.disabled=false; btn.innerHTML='🔍 뜻 검색'; }
+}
+
+/* 추가 버튼 */
+document.getElementById('add-btn').addEventListener('click', () => {
+  if (!pendingResult) return;
+  const entry = { ...pendingResult, source_sentence: pendingSourceSentence, sel_text: pendingSelText };
+  if (addToVocab(entry)) {
+    addHighlight(pendingResult.word);          // 사전형 (예: 走る)
+    if (pendingSelText && pendingSelText !== pendingResult.word) {
+      addHighlight(pendingSelText);            // 선택 원문 (예: 走ら)
+    }
+    reapplyHighlights();
+    showToast(`"${pendingResult.word}" 추가됨!`);
+    pendingResult = null; pendingSourceSentence = '';
+    document.getElementById('add-btn-wrap').style.display = 'none';
+    document.getElementById('result-area').innerHTML = '<div class="res-empty">EPUB 텍스트를<br>드래그하세요.</div>';
+    setStatus('');
+  } else { setStatus(`"${pendingResult.word}"은(는) 이미 있습니다.`, 'ok'); }
+});
+
+
+
+/* ═══════════════════════════════════════
+   EPUB 읽기 위치 저장
+═══════════════════════════════════════ */
+let currentEpubFilename = '';
+function getWorkMeta() { return {title:currentEpubFilename||''}; }
+function updateHeader() { document.getElementById('hd-title').textContent = currentEpubFilename||'—'; }
+function setEpubFilename(name) {
+  currentEpubFilename = name.replace(/\.epub$/i,'');
+  document.getElementById('epub-filename').textContent = currentEpubFilename;
+  updateHeader();
+  switchVocab(); // 파일에 맞는 단어장 로드
+}
+function epubProgressKey() { return 'epub_progress_'+currentEpubFilename; }
+function saveProgress() {
+  if (!currentEpubFilename) return;
+  localStorage.setItem(epubProgressKey(), JSON.stringify({spine:currentSpine, scroll:epubReader.scrollTop, ts:Date.now()}));
+}
+function loadProgress() {
+  if (!currentEpubFilename) return null;
+  try{return JSON.parse(localStorage.getItem(epubProgressKey())||'null');}catch(_){return null;}
+}
+
+/* ═══════════════════════════════════════
+   EPUB READER
+═══════════════════════════════════════ */
+let epubSpines=[], displayToc=[], currentSpine=0, fontSize=16;
+const epubDrop   = document.getElementById('epub-drop-zone');
+const epubReader = document.getElementById('epub-reader');
+// 하이라이트 클릭 이벤트 위임
+epubReader.addEventListener('click', e => {
+  const hl = e.target.closest('.epub-hl, .epub-hl-dup');
+  if (hl) { switchTab('list-tab'); highlightVocabCard(hl.dataset.word); }
+});
+const prevBtn    = document.getElementById('prev-btn');
+const nextBtn    = document.getElementById('next-btn');
+const pageInfo   = document.getElementById('epub-page-info');
+const tocPanel   = document.getElementById('toc-panel');
+const tocList    = document.getElementById('toc-list');
+const tocBtn     = document.getElementById('toc-btn');
+const fileInput  = document.getElementById('epub-file-input');
+
+document.getElementById('epub-file-btn').addEventListener('click', ()=>fileInput.click());
+fileInput.addEventListener('change', e=>{if(e.target.files[0]){setEpubFilename(e.target.files[0].name);loadEpub(e.target.files[0]);}});
+epubDrop.addEventListener('dragover', e=>{e.preventDefault();epubDrop.classList.add('drag-over');});
+epubDrop.addEventListener('dragleave', ()=>epubDrop.classList.remove('drag-over'));
+epubDrop.addEventListener('drop', e=>{e.preventDefault();epubDrop.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f?.name.endsWith('.epub')){setEpubFilename(f.name);loadEpub(f);}});
+
+async function loadEpub(file) {
+  epubDrop.style.display='flex';
+  epubDrop.innerHTML='<div class="drop-icon">⏳</div><p>파싱 중...</p>';
+  try {
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const containerXml = await zip.file('META-INF/container.xml').async('text');
+    const opfPath = containerXml.match(/full-path="([^"]+\.opf)"/i)?.[1];
+    if(!opfPath) throw new Error('OPF not found');
+    const opfBase = opfPath.slice(0,opfPath.lastIndexOf('/')+1);
+    const opfDoc  = new DOMParser().parseFromString(await zip.file(opfPath).async('text'),'application/xml');
+    const manifest={};
+    opfDoc.querySelectorAll('manifest item').forEach(i=>manifest[i.getAttribute('id')]=i.getAttribute('href'));
+    const spineIds=[...opfDoc.querySelectorAll('spine itemref')].map(i=>i.getAttribute('idref'));
+    let tocMap={};
+    const navItem=[...opfDoc.querySelectorAll('manifest item')].find(i=>i.getAttribute('properties')?.includes('nav'));
+    if(navItem){try{const nd=new DOMParser().parseFromString(await zip.file(opfBase+navItem.getAttribute('href')).async('text'),'text/html');nd.querySelectorAll('nav a').forEach(a=>{const h=a.getAttribute('href')?.split('#')[0];if(h)tocMap[h]=a.textContent.trim();});}catch(_){}}
+    if(!Object.keys(tocMap).length){const ncxId=opfDoc.querySelector('spine')?.getAttribute('toc');if(ncxId&&manifest[ncxId]){try{const nd=new DOMParser().parseFromString(await zip.file(opfBase+manifest[ncxId]).async('text'),'application/xml');nd.querySelectorAll('navPoint').forEach(n=>{const h=n.querySelector('content')?.getAttribute('src')?.split('#')[0];const t=n.querySelector('navLabel text')?.textContent?.trim();if(h&&t)tocMap[h]=t;});}catch(_){}}}
+    epubSpines=[];
+    for(let i=0;i<spineIds.length;i++){
+      const href=manifest[spineIds[i]];if(!href)continue;
+      try{
+        let html=await zip.file(opfBase+href).async('text');
+        html=html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<link[^>]*stylesheet[^>]*>/gi,'');
+        for(const m of [...html.matchAll(/src=["']([^"']+)["']/g)]){try{const f2=zip.file(opfBase+m[1].replace(/^\.\//,''));if(f2){const b64=await f2.async('base64');const ext=m[1].split('.').pop().toLowerCase();const mime=(ext==='jpg'||ext==='jpeg')?'image/jpeg':`image/${ext}`;html=html.replace(m[0],`src="data:${mime};base64,${b64}"`);}}catch(_){}}
+        epubSpines.push({title:tocMap[href]||`Chapter ${i+1}`,rawHtml:html});
+      }catch(_){}
+    }
+    if(!epubSpines.length) throw new Error('읽을 수 있는 챕터가 없습니다.');
+    displayToc=Object.keys(tocMap).length?epubSpines.map((s,i)=>({idx:i,title:s.title})).filter(x=>x.title!==`Chapter ${x.idx+1}`):epubSpines.map((s,i)=>({idx:i,title:s.title}));
+    tocList.innerHTML='';
+    displayToc.forEach(item=>{const b=document.createElement('button');b.className='toc-item';b.textContent=item.title;b.addEventListener('click',()=>{goTo(item.idx);tocPanel.style.display='none';});tocList.appendChild(b);});
+    epubDrop.style.display='none';
+    epubReader.classList.add('active');
+    prevBtn.disabled=nextBtn.disabled=tocBtn.disabled=false;
+    const prog=loadProgress();
+    if(prog&&prog.spine<epubSpines.length){
+      goTo(prog.spine,prog.scroll||0);
+      const mins=Math.round((Date.now()-prog.ts)/60000);
+      const ts=mins<60?`${mins}분 전`:mins<1440?`${Math.floor(mins/60)}시간 전`:`${Math.floor(mins/1440)}일 전`;
+      showToast(`📖 ${ts} 읽던 위치로 이동 (${prog.spine+1}/${epubSpines.length}챕터)`);
+    } else { goTo(0); }
+  }catch(err){epubDrop.innerHTML=`<div class="drop-icon">⚠️</div><p>오류: ${err.message}</p>`;}
+}
+
+function goTo(idx, scrollTop=0) {
+  idx=Math.max(0,Math.min(epubSpines.length-1,idx));
+  currentSpine=idx;
+  const body=new DOMParser().parseFromString(epubSpines[idx].rawHtml,'text/html').body;
+  body.querySelectorAll('[style]').forEach(el=>{el.style.fontFamily='';el.style.fontSize='';el.style.color='';el.style.background='';});
+  epubReader.innerHTML=body.innerHTML;
+  epubReader.style.fontSize=fontSize+'px';
+  epubReader.scrollTop=scrollTop;
+  pageInfo.textContent=`${idx+1} / ${epubSpines.length}`;
+  prevBtn.disabled=idx===0; nextBtn.disabled=idx===epubSpines.length-1;
+  tocList.querySelectorAll('.toc-item').forEach((b,i)=>b.classList.toggle('active',displayToc[i]?.idx===idx));
+  saveProgress();
+  // 하이라이트 적용
+  applyHighlights();
+
+}
+
+let scrollSaveTimer=null;
+epubReader.addEventListener('scroll',()=>{clearTimeout(scrollSaveTimer);scrollSaveTimer=setTimeout(saveProgress,500);});
+prevBtn.addEventListener('click',()=>goTo(currentSpine-1));
+nextBtn.addEventListener('click',()=>goTo(currentSpine+1));
+tocBtn.addEventListener('click',()=>{tocPanel.style.display=tocPanel.style.display==='block'?'none':'block';});
+document.addEventListener('click',e=>{if(!tocPanel.contains(e.target)&&e.target!==tocBtn)tocPanel.style.display='none';});
+document.getElementById('font-up').addEventListener('click',()=>{fontSize=Math.min(28,fontSize+1);epubReader.style.fontSize=fontSize+'px';});
+document.getElementById('font-dn').addEventListener('click',()=>{fontSize=Math.max(12,fontSize-1);epubReader.style.fontSize=fontSize+'px';});
+
+// 정렬
+document.getElementById('align-left-btn').addEventListener('click',()=>{
+  epubReader.style.textAlign='left';
+  document.getElementById('align-left-btn').classList.add('active');
+  document.getElementById('align-justify-btn').classList.remove('active');
+});
+document.getElementById('align-justify-btn').addEventListener('click',()=>{
+  epubReader.style.textAlign='justify';
+  document.getElementById('align-justify-btn').classList.add('active');
+  document.getElementById('align-left-btn').classList.remove('active');
+});
+
+// 배경 테마
+const themes = ['white','sepia','dark'];
+function setTheme(t) {
+  themes.forEach(th => {
+    epubReader.classList.toggle('theme-'+th, th===t);
+    const btn = document.getElementById('theme-'+th+'-btn');
+    if(btn) btn.classList.toggle('active', th===t);
+  });
+  // 툴바 배경도 테마에 맞게
+  const toolbar = document.querySelector('.epub-toolbar');
+  if(t==='dark') toolbar.style.background='#181825';
+  else if(t==='sepia') toolbar.style.background='#ede8dc';
+  else toolbar.style.background='var(--paper)';
+  localStorage.setItem('epub_reader_theme', t);
+}
+function setAlign(a) {
+  epubReader.style.textAlign = a;
+  document.getElementById('align-left-btn').classList.toggle('active', a==='left');
+  document.getElementById('align-justify-btn').classList.toggle('active', a==='justify');
+  localStorage.setItem('epub_reader_align', a);
+}
+document.getElementById('theme-white-btn').addEventListener('click',()=>setTheme('white'));
+document.getElementById('theme-sepia-btn').addEventListener('click',()=>setTheme('sepia'));
+document.getElementById('theme-dark-btn').addEventListener('click',()=>setTheme('dark'));
+document.getElementById('align-left-btn').addEventListener('click',()=>setAlign('left'));
+document.getElementById('align-justify-btn').addEventListener('click',()=>setAlign('justify'));
+
+// 설정 복원
+(()=>{
+  const savedTheme = localStorage.getItem('epub_reader_theme') || 'white';
+  const savedAlign = localStorage.getItem('epub_reader_align') || 'left';
+  setTheme(savedTheme);
+  setAlign(savedAlign);
+})();
+document.getElementById('hl-btn').addEventListener('click',()=>{
+  if(!epubReader.classList.contains('active')){showToast('먼저 EPUB을 열어주세요.');return;}
+  applyHighlights();
+  const cnt = epubReader.querySelectorAll('.epub-hl').length;
+  showToast(cnt ? `${cnt}곳 하이라이트 적용됨` : '하이라이트할 단어가 없습니다.');
+});
+
+/* ═══════════════════════════════════════
+   TEXT SELECTION  → 왼쪽 패널 + 하단 바
+═══════════════════════════════════════ */
+let selText='', selSentence='';
+
+function hideSelPanel() {
+  selText=''; selSentence='';
+  document.getElementById('sel-word-panel').classList.remove('visible');
+  const ae=document.activeElement;
+  if(!ae||!(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))window.getSelection()?.removeAllRanges();
+}
+
+function extractSentence(range) {
+  const tn = range.commonAncestorContainer;
+  const full = tn.nodeType===Node.TEXT_NODE ? tn.textContent : tn.textContent||'';
+  const off  = range.startOffset;
+  const back = full.slice(0,off);
+  const last = Math.max(back.lastIndexOf('。'),back.lastIndexOf('！'),back.lastIndexOf('？'),back.lastIndexOf('!'),back.lastIndexOf('?'),back.lastIndexOf('\n'),back.lastIndexOf('.'));
+  const start = last>=0?last+1:0;
+  let end=off;
+  for(let i=off;i<full.length;i++){if(/[。！？!?\n.]/.test(full[i])){end=i+1;break;}end=i+1;}
+  return full.slice(start,end).trim().replace(/\s+/g,' ');
+}
+
+function handleSel() {
+  const sel = window.getSelection();
+  const txt = sel?.toString().trim();
+  if(!txt||txt.length<1||txt.length>30){hideSelPanel();return;}
+  selText=txt; 
+  try{const r=sel.getRangeAt(0);selSentence=extractSentence(r);}catch(_){selSentence='';}
+
+  // 왼쪽 패널 업데이트
+  document.getElementById('sel-word-display').textContent=txt;
+  const sentEl=document.getElementById('sel-sentence-display');
+  if(selSentence){
+    const esc=txt.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    sentEl.innerHTML=selSentence.replace(new RegExp(`(${esc})`,'g'),'<em>$1</em>');
+  }else{sentEl.textContent='';}
+  switchTab('draw-tab');
+  document.getElementById('sel-word-panel').classList.add('visible');
+
+
+}
+
+let selTimer=null;
+document.addEventListener('selectionchange',()=>{
+  const sel=window.getSelection();
+  if(!sel||!sel.rangeCount){return;}
+  const r=sel.getRangeAt(0);
+  if(!epubReader.contains(r.commonAncestorContainer)){hideSelPanel();return;}
+  clearTimeout(selTimer);selTimer=setTimeout(handleSel,300);
+});
+epubReader.addEventListener('mouseup',()=>setTimeout(handleSel,50));
+document.addEventListener('touchstart',e=>{const tag=e.target.tagName;if(tag==='INPUT'||tag==='TEXTAREA'||tag==='BUTTON'||tag==='SELECT')return;if(!document.getElementById('sel-word-panel').contains(e.target)&&!epubReader.contains(e.target))hideSelPanel();},{passive:true});
+document.addEventListener('mousedown',e=>{const tag=e.target.tagName;if(tag==='INPUT'||tag==='TEXTAREA'||tag==='BUTTON'||tag==='SELECT')return;if(!document.getElementById('sel-word-panel').contains(e.target)&&!epubReader.contains(e.target))hideSelPanel();});
+
+// 왼쪽 패널 버튼
+document.getElementById('sel-lookup-btn').addEventListener('click',()=>{const w=selText,s=selSentence,orig=selText;hideSelPanel();if(w)lookupWord(w,s,orig);});
+document.getElementById('sel-direct-btn').addEventListener('click',()=>{
+  const w=selText,s=selSentence;hideSelPanel();if(!w)return;
+  if(isDup(w)){showToast(`"${w}"은(는) 이미 있습니다.`);return;}
+  addToVocab({word:w,reading:'—',meaning:PENDING_MEANING,part_of_speech:'',source_sentence:s,sel_text:w});
+  addHighlight(w); reapplyHighlights();
+  showToast(`"${w}" 추가됨!`); switchTab('list-tab');
+});
+document.getElementById('sel-cancel-btn').addEventListener('click',hideSelPanel);
+
+
+
+/* ═══════════════════════════════════════
+   API 키 모달
+═══════════════════════════════════════ */
+function renderApiKeyList() {
+  const list=document.getElementById('api-key-list');
+  const bar =document.getElementById('api-key-status-bar');
+  if(!apiStore.keys.length){list.innerHTML='<div style="font-size:12px;color:var(--ink-f);text-align:center;padding:8px">저장된 키 없음</div>';document.getElementById('api-status').textContent='';bar.textContent='';return;}
+  list.innerHTML=apiStore.keys.map(k=>{const on=k.id===apiStore.activeId;return`<div class="api-key-row${on?' active-key':''}"><div class="api-key-dot${on?' on':''}" data-id="${k.id}"></div><span class="api-key-label${on?' on':''}" data-id="${k.id}">${k.label}${on?' ✓':''}</span><button class="api-key-del" data-id="${k.id}">×</button></div>`;}).join('');
+  list.querySelectorAll('.api-key-dot,.api-key-label').forEach(el=>el.addEventListener('click',()=>{apiStore.activeId=+el.dataset.id;saveApiStore(apiStore);renderApiKeyList();updateApiStatus();}));
+  list.querySelectorAll('.api-key-del').forEach(el=>el.addEventListener('click',()=>{const id=+el.dataset.id;apiStore.keys=apiStore.keys.filter(k=>k.id!==id);if(apiStore.activeId===id)apiStore.activeId=apiStore.keys[0]?.id||null;saveApiStore(apiStore);renderApiKeyList();updateApiStatus();}));
+  const active=apiStore.keys.find(k=>k.id===apiStore.activeId);
+  bar.textContent=active?`현재: ${active.label}`:'';
+}
+function updateApiStatus(){const n=apiStore.keys.length;document.getElementById('api-status').textContent=n?`✓ ${n}개`:'';}
+updateApiStatus();
+// 인라인 API 키 저장
+// 모델 입력 초기화 및 저장
+(()=>{
+  const mi = document.getElementById('model-input');
+  mi.value = MODEL;
+  mi.addEventListener('change', () => {
+    const v = mi.value.trim();
+    if (!v) return;
+    MODEL = v;
+    localStorage.setItem('gemini_model', v);
+    showToast('모델 변경: ' + v);
+  });
+  mi.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { mi.blur(); }
+  });
+})();
+
+document.getElementById('api-inline-save').addEventListener('click', () => {
+  const v = document.getElementById('api-inline-input').value.trim();
+  if (!v) { alert('API 키를 입력해주세요.'); return; }
+  const id = Date.now();
+  const label = v.slice(0,8)+'…'+v.slice(-4);
+  apiStore.keys.push({ id, label, value: v });
+  if (!apiStore.activeId) apiStore.activeId = id;
+  saveApiStore(apiStore);
+  document.getElementById('api-inline-input').value = '';
+  updateApiStatus();
+  showToast('API 키 저장됨: ' + label);
+});
+document.getElementById('api-inline-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('api-inline-save').click();
+});
+document.getElementById('api-manage-btn').addEventListener('click',()=>{renderApiKeyList();document.getElementById('api-modal-backdrop').classList.add('open');setTimeout(()=>document.getElementById('api-new-input').focus(),100);});
+document.getElementById('api-modal-close').addEventListener('click',()=>document.getElementById('api-modal-backdrop').classList.remove('open'));
+document.getElementById('api-modal-backdrop').addEventListener('click',e=>{if(e.target===document.getElementById('api-modal-backdrop'))document.getElementById('api-modal-backdrop').classList.remove('open');});
+// 토글: 평문 ↔ 마스킹 (입력은 항상 평문으로)
+let apiMasked = false;
+document.getElementById('api-toggle-vis').addEventListener('click', () => {
+  const inp = document.getElementById('api-new-input');
+  const btn = document.getElementById('api-toggle-vis');
+  apiMasked = !apiMasked;
+  inp.style.color = apiMasked ? 'transparent' : '';
+  inp.style.textShadow = apiMasked ? '0 0 8px rgba(0,0,0,0.5)' : '';
+  btn.textContent = apiMasked ? '🙈' : '👁';
+  inp.focus();
+});
+document.getElementById('api-add-btn').addEventListener('click',()=>{const inp=document.getElementById('api-new-input');const v=inp.value.trim();if(!v)return;const id=Date.now();apiStore.keys.push({id,label:v.slice(0,8)+'…'+v.slice(-4),value:v});if(!apiStore.activeId)apiStore.activeId=id;saveApiStore(apiStore);inp.value='';apiMasked=false;inp.style.color='';inp.style.textShadow='';document.getElementById('api-toggle-vis').textContent='👁';renderApiKeyList();updateApiStatus();});
+document.getElementById('api-new-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('api-add-btn').click();});
+
+/* ═══════════════════════════════════════
+   저장소 모달
+═══════════════════════════════════════ */
+function bytesStr(n){if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(2)+' MB';}
+function openStorageModal(){
+  document.getElementById('sm-epub-name').textContent = currentEpubFilename ? `(${currentEpubFilename})` : '(EPUB 없음)';
+  document.getElementById('sm-vocab-count').textContent=vocab.length+'개';
+  const rawV = currentEpubFilename ? (localStorage.getItem(vocabKey())||'') : '';
+  document.getElementById('sm-vocab-size').textContent=bytesStr(new Blob([rawV]).size);
+
+  // 모든 EPUB 단어장 목록
+  const allKeys = allVocabKeys();
+  const allDiv = document.getElementById('sm-all-vocabs');
+  if (!allKeys.length) {
+    allDiv.innerHTML = '<div style="font-size:11px;color:var(--ink-f);padding:4px 2px">저장된 단어장 없음</div>';
+  } else {
+    allDiv.innerHTML = allKeys.map(k => {
+      const name = k.replace(VOCAB_PREFIX, '');
+      let cnt = 0, sz = 0;
+      try { const d = JSON.parse(localStorage.getItem(k)||'{}'); cnt = (d.words||d||[]).length; sz = new Blob([localStorage.getItem(k)||'']).size; } catch(_) {}
+      const isActive = name === currentEpubFilename;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:white;border:1px solid ${isActive?'var(--blue)':'var(--border-l)'};border-radius:6px">
+        <span style="flex:1;font-size:11px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${name}">${name}${isActive?' ✓':''}</span>
+        <span style="font-size:10px;color:var(--ink-f);white-space:nowrap">${cnt}개 · ${bytesStr(sz)}</span>
+        <button style="background:none;border:none;color:#c00;font-size:12px;cursor:pointer;padding:1px 4px" data-vkey="${k}" class="sm-vdel" title="삭제">×</button>
+      </div>`;
+    }).join('');
+    allDiv.querySelectorAll('.sm-vdel').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const k = btn.dataset.vkey;
+        const name = k.replace(VOCAB_PREFIX,'');
+        if (!confirm(`"${name}" 단어장을 삭제합니까?`)) return;
+        localStorage.removeItem(k);
+        if (name === currentEpubFilename) { vocab=[]; renderVocab(); }
+        openStorageModal();
+        showToast(`"${name}" 단어장 삭제됨`);
+      });
+    });
+  }
+  document.getElementById('sm-api-count').textContent=(apiStore?.keys?.length||0)+'개';
+  const progKeys=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k?.startsWith('epub_progress_'))progKeys.push(k);}
+  const pl=document.getElementById('sm-progress-list');
+  pl.innerHTML=progKeys.length?progKeys.map(k=>{let info='';try{const d=JSON.parse(localStorage.getItem(k));const m=Math.round((Date.now()-d.ts)/60000);info=`${d.spine+1}챕터 · ${m<60?m+'분 전':m<1440?Math.floor(m/60)+'시간 전':Math.floor(m/1440)+'일 전'}`;}catch(_){}return`<div class="sm-pi"><span class="sm-pi-name">${k.replace('epub_progress_','')}</span><span class="sm-pi-info">${info}</span><button class="sm-pi-del" data-key="${k}">×</button></div>`;}).join(''):'<div style="font-size:11px;color:var(--ink-f);padding:4px 2px">기록 없음</div>';
+  pl.querySelectorAll('.sm-pi-del').forEach(b=>b.addEventListener('click',()=>{localStorage.removeItem(b.dataset.key);openStorageModal();}));
+  let tot=0;for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);tot+=(k.length+(localStorage.getItem(k)||'').length)*2;}
+  document.getElementById('sm-total-size').textContent=bytesStr(tot)+' / ~5~10 MB';
+  document.getElementById('storage-modal-backdrop').classList.add('open');
+}
+// 가로/세로 모드 전환
+let orientMode = localStorage.getItem('epub_orient') || 'landscape';
+function applyOrient(mode) {
+  orientMode = mode;
+  const main = document.querySelector('.main');
+  const btn  = document.getElementById('orient-btn');
+  if (mode === 'portrait') {
+    main.classList.add('portrait');
+    btn.textContent = '⇅';
+    btn.title = '가로 모드로 전환';
+    // 세로 모드: vocab(위) epub(아래) — grid order
+    document.querySelector('.vocab-panel').style.order = '0';
+    document.querySelector('.epub-panel').style.order  = '1';
+  } else {
+    main.classList.remove('portrait');
+    btn.textContent = '⇄';
+    btn.title = '세로 모드로 전환';
+    document.querySelector('.vocab-panel').style.order = '';
+    document.querySelector('.epub-panel').style.order  = '';
+  }
+  localStorage.setItem('epub_orient', mode);
+}
+applyOrient(orientMode);
+document.getElementById('orient-btn').addEventListener('click', () => {
+  applyOrient(orientMode === 'landscape' ? 'portrait' : 'landscape');
+});
+
+document.getElementById('storage-btn').addEventListener('click',openStorageModal);
+document.getElementById('storage-modal-close').addEventListener('click',()=>document.getElementById('storage-modal-backdrop').classList.remove('open'));
+document.getElementById('storage-modal-backdrop').addEventListener('click',e=>{if(e.target===document.getElementById('storage-modal-backdrop'))document.getElementById('storage-modal-backdrop').classList.remove('open');});
+document.getElementById('sm-vocab-backup').addEventListener('click',()=>{
+  if(!currentEpubFilename){alert('EPUB을 먼저 열어주세요.');return;}
+  if(!vocab.length){alert('단어장이 비어있습니다.');return;}
+  const data = { epub: currentEpubFilename, savedAt: new Date().toISOString(), words: vocab };
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  const fname = currentEpubFilename.replace(/[/\\?%*:|"<>]/g,'_').slice(0,40);
+  a.download = fname+'_단어장_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); showToast('JSON 저장 완료!');
+});
+document.getElementById('sm-vocab-restore-btn').addEventListener('click',()=>document.getElementById('sm-vocab-restore-input').click());
+document.getElementById('sm-vocab-restore-input').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      // 새 포맷 { epub, words } 또는 구버전 배열
+      const words = Array.isArray(parsed) ? parsed : (parsed.words || []);
+      const srcEpub = parsed.epub || '';
+      if(!words.length) throw new Error('단어가 없습니다.');
+      const msg = srcEpub
+        ? `"${srcEpub}" 단어장 (${words.length}개)을 현재 단어장에 병합합니까?`
+        : `${words.length}개 단어를 현재 단어장에 병합합니까?`;
+      if(!confirm(msg)) return;
+      let n=0;
+      words.forEach(v=>{
+        if(v.word&&!isDup(v.word)){vocab.push(v);n++;}
+        // 하이라이트 목록에도 등록 (중복이어도 누락된 하이라이트 복구)
+        if(v.word) addHighlight(v.word);
+        if(v.sel_text && v.sel_text!==v.word) addHighlight(v.sel_text);
+      });
+      saveVocab(); renderVocab();
+      if(epubReader.classList.contains('active')) applyHighlights();
+      document.getElementById('storage-modal-backdrop').classList.remove('open');
+      showToast(`${n}개 복원 완료!`);
+    } catch(err) { alert('불러오기 실패: '+err.message); }
+  };
+  r.readAsText(f); e.target.value='';
+});
+document.getElementById('sm-vocab-clear').addEventListener('click',()=>{
+  if(!currentEpubFilename){alert('EPUB을 먼저 열어주세요.');return;}
+  if(!vocab.length){alert('비어있습니다.');return;}
+  if(!confirm(`"${currentEpubFilename}" 단어장의 ${vocab.length}개 단어를 모두 삭제합니까?`))return;
+  vocab.length=0; saveVocab(); renderVocab(); openStorageModal(); showToast('단어장 삭제 완료.');
+});
+document.getElementById('sm-progress-clear-all').addEventListener('click',()=>{const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k?.startsWith('epub_progress_'))ks.push(k);}if(!ks.length){alert('기록 없음');return;}if(!confirm(`읽기 위치 기록 ${ks.length}개를 삭제합니까?`))return;ks.forEach(k=>localStorage.removeItem(k));openStorageModal();showToast('기록 삭제 완료.');});
+
+/* ═══════════════════════════════════════
+   EXPORT
+═══════════════════════════════════════ */
+const EXPORT_COLS = ['파일명','단어','요미가나','품사','한국어뜻','출처문장','한자분해'];
+function formatKanjiBreakdown(kb) {
+  if (!kb || !kb.length) return '';
+  return kb.map(k => `${k.char}(${k.reading||''}·${k.meaning||''})`).join(' / ');
+}
+function vocabToRows(){return vocab.map(v=>[v.title||'',v.word||'',v.reading||'',v.part_of_speech||'',v.meaning||'',v.source_sentence||'',formatKanjiBreakdown(v.kanji_breakdown)]);}
+
+document.getElementById('batch-lookup-btn').addEventListener('click', runBatchLookup);
+
+document.getElementById('export-tsv-btn').addEventListener('click',()=>{
+  if(!vocab.length){alert('단어장이 비어있습니다.');return;}
+  const rows=[EXPORT_COLS,...vocabToRows()];
+  const tsv=rows.map(r=>r.map(c=>String(c).replace(/\t/g,' ').replace(/\n/g,' ')).join('\t')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+tsv],{type:'text/tab-separated-values;charset=utf-8'}));
+  a.download=(currentEpubFilename||'단어장').replace(/[/\\?%*:|"<>]/g,'_')+'_단어장.tsv';
+  a.click();showToast('TSV 저장 완료!');
+});
+
+document.getElementById('export-xlsx-btn').addEventListener('click',()=>{
+  if(!vocab.length){alert('단어장이 비어있습니다.');return;}
+  const rows=[EXPORT_COLS,...vocabToRows()];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:20},{wch:10},{wch:14},{wch:8},{wch:20},{wch:50},{wch:40}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,(currentEpubFilename||'단어장').slice(0,31));
+  XLSX.writeFile(wb,(currentEpubFilename||'단어장').replace(/[/\\?%*:|"<>]/g,'_')+'_단어장.xlsx');
+  showToast('Excel 저장 완료!');
+});
+
+// ── PDF 시스템 ──
+
+/* vocab 단어 목록 → Set (하이라이트 매칭용) */
+function getVocabWordSet() {
+  const s = new Set();
+  vocab.forEach(v => {
+    if (v.word) s.add(v.word);
+    if (v.sel_text) s.add(v.sel_text);
+  });
+  return s;
+}
+
+/**
+ * vocab 배열을 EPUB 본문 등장 순으로 정렬한 복사본 반환.
+ * 원본 vocab 배열은 변경하지 않음.
+ * EPUB이 없으면 원본 순서 그대로.
+ */
+function sortVocabByEpubOrder(vocabArr) {
+  if (!epubSpines.length) return [...vocabArr];
+
+  // 전체 본문을 하나의 문자열로 합침 (스파인 순서 유지)
+  const parser = new DOMParser();
+  let fullText = '';
+  epubSpines.forEach(spine => {
+    const doc = parser.parseFromString(spine.rawHtml, 'text/html');
+    fullText += doc.body.textContent;
+  });
+
+  // 각 vocab 항목의 첫 등장 위치를 구함
+  // sel_text(활용형)와 word(원형) 중 더 앞에 나오는 위치 사용
+  const getPos = v => {
+    const positions = [];
+    if (v.word)     { const i = fullText.indexOf(v.word);     if (i !== -1) positions.push(i); }
+    if (v.sel_text) { const i = fullText.indexOf(v.sel_text); if (i !== -1) positions.push(i); }
+    return positions.length ? Math.min(...positions) : Infinity; // 본문에 없으면 맨 뒤
+  };
+
+  return [...vocabArr].sort((a, b) => getPos(a) - getPos(b));
+}
+
+/* 단어 Set 기준으로 텍스트 노드 하이라이트 HTML 생성 */
+function highlightText(text, wordSet, seenWords) {
+  if (!wordSet || !wordSet.size) return escHtml(text);
+  // word → pos CSS class 매핑
+  const wordPosMap = {};
+  vocab.forEach(v => {
+    const pc = posCss(v);
+    if (v.word) wordPosMap[v.word] = pc;
+    if (v.sel_text && v.sel_text !== v.word) wordPosMap[v.sel_text] = pc;
+  });
+  const escaped = [...wordSet].map(w => w.replace(/[-[\]{}()*+?.,\\^$|#]/g,'\\$&'));
+  const re = new RegExp(`(${escaped.join('|')})`, 'g');
+  return escHtml(text).replace(re, (match, word) => {
+    const cleanWord = word.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+    const pc = wordPosMap[cleanWord] || 'pos-other';
+    const isDup = seenWords && seenWords.has(cleanWord);
+    if (isDup) {
+      return `<span class="pdf-hl-dup ${pc}">` + word + '</span>';
+    }
+    return `<span class="pdf-hl ${pc}">` + word + '</span>';
+  });
+}
+function escHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* EPUB 전체 텍스트 수집 (모든 스파인) */
+function getAllEpubText() {
+  if (!epubSpines.length) return [];
+  const parser = new DOMParser();
+  const paragraphs = [];
+  epubSpines.forEach(spine => {
+    const doc = parser.parseFromString(spine.rawHtml, 'text/html');
+    const body = doc.body;
+    const blocks = body.querySelectorAll('p, h1, h2, h3, li');
+    if (blocks.length === 0) {
+      body.querySelectorAll('div').forEach(el => {
+        if (el.querySelector('div, p')) return;
+        const t = el.textContent.trim();
+        if (t.length > 0) paragraphs.push({ text: t, chapterTitle: spine.title });
+        else paragraphs.push({ text: '', chapterTitle: spine.title, isEmpty: true });
+      });
+    } else {
+      blocks.forEach(el => {
+        const t = el.textContent.trim();
+        if (t.length > 0) {
+          paragraphs.push({ text: t, chapterTitle: spine.title });
+        } else {
+          paragraphs.push({ text: '', chapterTitle: spine.title, isEmpty: true });
+        }
+      });
+    }
+  });
+  return paragraphs;
+}
+
+/* 챕터 경계 삽입 */
+function injectChapterHeaders(paragraphs) {
+  const result = [];
+  let lastChapter = null;
+  paragraphs.forEach(p => {
+    if (p.chapterTitle !== lastChapter) {
+      result.push({ text: p.chapterTitle, isChapterHeader: true });
+      lastChapter = p.chapterTitle;
+    }
+    result.push(p);
+  });
+  return result;
+}
+
+/* 단어 카드 DOM 생성 */
+function makeCard(v) {
+  const card = document.createElement('div');
+  card.className = 'pdf-word-card';
+  const kbLine = (v.kanji_breakdown||[]).map(k =>
+    k.char + (k.reading ? '(' + k.reading + ')' : '') + (k.meaning ? ' ' + k.meaning : '')
+  ).join(' · ');
+  const pl = posLabel(v), pc = posCss(v);
+  // 품사 배경색 (CSS 변수 → 인라인으로 PDF에도 적용)
+  const posColors = {
+    'pos-verb':'#fde68a','pos-noun':'#bae6fd','pos-iadj':'#bbf7d0',
+    'pos-nadj':'#e9d5ff','pos-adv':'#fed7aa','pos-other':'#e2e8f0'
+  };
+  const baseColor = posColors[pc] || '#e2e8f0';
+  // 카드 배경: 품사색을 15% 불투명도로 흰색에 혼합 (매우 연하게)
+  // hex → rgb 변환 후 rgba로 적용
+  const hex2rgb = h => [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+  const [r,g,b] = hex2rgb(baseColor);
+  const cardBg     = `rgba(${r},${g},${b},0.18)`;
+  const cardBorder = `rgba(${r},${g},${b},0.55)`;
+  const bgc = baseColor; // 품사 뱃지용
+  card.innerHTML =
+    '<div class="pdf-wc-word">' + escHtml(v.word) +
+    (pl ? `<span class="pdf-wc-pos" style="background:${bgc};color:#333">${escHtml(pl)}</span>` : '') +
+    '</div>' +
+    '<div class="pdf-wc-read">' + escHtml(v.reading||'') + '</div>' +
+    '<div class="pdf-wc-mean">' + escHtml(v.meaning||'') + '</div>' +
+    (kbLine ? '<div class="pdf-wc-kanji">' + escHtml(kbLine) + '</div>' : '');
+  card.style.background   = cardBg;
+  card.style.borderColor  = cardBorder;
+  card.style.borderLeftColor = cardBorder;
+  return card;
+}
+
+/*
+  buildPdfPages():
+  - 전체 EPUB 본문을 A4(794px) 기준 페이지들로 분할
+  - 각 페이지: 본문(좌) | 세로줄 | 단어카드(우)
+  - 페이지 분할: 본문 단락을 probe div에 넣어 누적 높이 측정 후 A4 한계 초과 시 분할
+  - 잘림 없음: overflow visible, 페이지 높이는 콘텐츠에 맞게 가변
+*/
+const PDF_PAGE_WIDTH   = 794;
+const PDF_PAD_H        = 48;  // 상하 패딩
+const PDF_USABLE_H     = 1123 - PDF_PAD_H * 2 - 36; // ≈991px (1123 = A4 px 기준)
+const PDF_FIRST_HDR_H  = 60;  // 첫 페이지 헤더 높이
+const PDF_PROBE_W      = PDF_PAGE_WIDTH - PDF_PAD_H * 2 - 185 - 16; // 텍스트 컬럼 너비
+
+async function buildPdfPages(onProgress) {
+  const ws = getVocabWordSet();
+  const allParas = injectChapterHeaders(getAllEpubText());
+  // 본문 순 정렬된 vocab (카드 순서용)
+  const sortedVocab = sortVocabByEpubOrder(vocab);
+
+  /* ── 1. probe: 각 단락 높이 측정 ── */
+  const probe = document.createElement('div');
+  probe.style.cssText =
+    `position:fixed;left:-9999px;top:0;width:${PDF_PROBE_W}px;` +
+    `font-family:"Noto Serif JP",serif;font-size:11.5px;line-height:2;` +
+    `box-sizing:border-box;visibility:hidden;background:white;word-break:break-all`;
+  document.body.appendChild(probe);
+
+  const paraEls = [];
+  const seenProbe = new Set();
+
+  allParas.forEach(para => {
+    let el;
+    if (para.isChapterHeader) {
+      el = document.createElement('div');
+      el.className = 'pdf-chapter-hdr';
+      el.style.cssText = 'font-weight:700;font-size:13px;border-bottom:1px solid #eee;padding:6px 0 3px;font-family:"Noto Sans KR",sans-serif;color:#1a1a2e;margin-bottom:8px';
+      el.textContent = para.text;
+    } else if (para.isEmpty || !para.text) {
+      el = document.createElement('div');
+      el.className = 'pdf-empty-line';
+      el.style.height = '13px';
+    } else {
+      el = document.createElement('p');
+      el.style.cssText = 'margin:0 0 11px 0;text-indent:1em;line-height:2;font-size:11.5px;font-family:"Noto Serif JP",serif;word-break:break-all';
+      el.innerHTML = highlightText(para.text, ws, seenProbe);
+      // 이 단락에 나오는 카드 단어 seenProbe에 추가
+      ws.forEach(w => {
+        if (para.text.includes(w) && !seenProbe.has(w)) {
+          seenProbe.add(w);
+        }
+      });
+    }
+    probe.appendChild(el);
+    paraEls.push({ el, para });
+  });
+
+  await new Promise(r => setTimeout(r, 100));
+  const heights = paraEls.map(pe =>
+    Math.ceil(pe.el.getBoundingClientRect().height || pe.el.offsetHeight || 13)
+  );
+  document.body.removeChild(probe);
+
+  /* ── 2. 높이 기반 페이지 그룹 분할 ── */
+  const pageGroups = [];
+  let curIndices = [], curH = 0, isFirst = true;
+  const firstLimit  = PDF_USABLE_H - PDF_FIRST_HDR_H;
+  const normalLimit = PDF_USABLE_H;
+
+  heights.forEach((h, i) => {
+    const limit = isFirst ? firstLimit : normalLimit;
+    if (curH + h > limit && curIndices.length > 0) {
+      pageGroups.push({ indices: curIndices, isFirst });
+      curIndices = []; curH = 0; isFirst = false;
+    }
+    curIndices.push(i);
+    curH += h;
+  });
+  if (curIndices.length) pageGroups.push({ indices: curIndices, isFirst });
+
+  const totalPages = pageGroups.length;
+
+  /* ── 3. 페이지 DOM 생성 ── */
+  const seenWords = new Set(); // 전체 단어 중복 방지
+  const pages = [];
+
+  pageGroups.forEach((group, gi) => {
+    if (onProgress) onProgress(gi + 1, totalPages);
+
+    const page = document.createElement('div');
+    page.className = 'pdf-page';
+
+    // 첫 페이지 헤더
+    if (group.isFirst) {
+      const hdr = document.createElement('div');
+      hdr.className = 'pdf-page-header';
+      hdr.innerHTML =
+        '<h2>' + escHtml(currentEpubFilename || '일본어 단어장') + '</h2>' +
+        '<span>' + new Date().toLocaleDateString('ko-KR') + '</span>';
+      page.appendChild(hdr);
+    }
+
+    // 본문 + 카드 래퍼
+    const bodyWrap = document.createElement('div');
+    bodyWrap.className = 'pdf-body-wrap';
+
+    const textCol = document.createElement('div');
+    textCol.className = 'pdf-text-col';
+
+    const cardCol = document.createElement('div');
+    cardCol.className = 'pdf-card-col';
+
+    const pageSeenWords = new Set(); // 이 페이지 하이라이트 추적
+
+    group.indices.forEach(i => {
+      const { para } = paraEls[i];
+
+      if (para.isChapterHeader) {
+        const hdr = document.createElement('div');
+        hdr.className = 'pdf-chapter-hdr';
+        hdr.textContent = para.text;
+        textCol.appendChild(hdr);
+      } else if (para.isEmpty || !para.text) {
+        const emp = document.createElement('div');
+        emp.className = 'pdf-empty-line';
+        textCol.appendChild(emp);
+      } else {
+        const p = document.createElement('p');
+        p.innerHTML = highlightText(para.text, ws, seenWords);
+        textCol.appendChild(p);
+
+        // 이 단락에 나오는 단어 → 카드 (전체 중복 방지)
+        const paraCards = [];
+        sortedVocab.forEach(v => {
+          const mw = v.sel_text || v.word;
+          if (!para.text.includes(mw) && !para.text.includes(v.word)) return;
+          if (seenWords.has(v.word)) return;
+          seenWords.add(v.word);
+          paraCards.push(v);
+        });
+
+        if (paraCards.length > 0) {
+          // 이전 단락 카드가 있으면 점선 구분선 삽입
+          if (cardCol.childElementCount > 0) {
+            const sep = document.createElement('div');
+            sep.style.cssText = 'border-top:1.5px dashed #d4c97a;margin:3px 0;width:100%';
+            cardCol.appendChild(sep);
+          }
+          paraCards.forEach(v => cardCol.appendChild(makeCard(v)));
+        }
+
+        // seenWords에 이 단락 단어 추가 (다음 단락 중복 하이라이트용)
+        ws.forEach(w => { if (para.text.includes(w)) seenWords.add(w); });
+      }
+    });
+
+    bodyWrap.appendChild(textCol);
+    bodyWrap.appendChild(cardCol);
+    page.appendChild(bodyWrap);
+
+    // 푸터
+    const footer = document.createElement('div');
+    footer.className = 'pdf-page-footer';
+    footer.innerHTML =
+      '<span>' + escHtml(currentEpubFilename || '단어장') + '</span>' +
+      '<span>' + (gi + 1) + ' / ' + totalPages + '</span>';
+    page.appendChild(footer);
+
+    pages.push(page);
+  });
+
+  return pages;
+}
+
+/* PDF 버튼 → 미리보기 열기 */
+document.getElementById('export-pdf-btn').addEventListener('click', () => {
+  if (!vocab.length)      { alert('단어장이 비어있습니다.'); return; }
+  if (!epubSpines.length) { alert('EPUB을 먼저 열어주세요.'); return; }
+  document.getElementById('pdf-preview-backdrop').classList.add('open');
+  buildPreview();
+});
+
+/* 미리보기 빌드 (전체 페이지 DOM 표시, 스크롤로 확인) */
+async function buildPreview() {
+  const wrap = document.getElementById('pdf-pages-wrap');
+  const msg  = document.getElementById('pdf-progress-msg');
+  wrap.innerHTML = '';
+  msg.textContent = '렌더링 중...';
+  msg.style.color = '#aaa';
+  try {
+    const pages = await buildPdfPages((cur, total) => {
+      msg.textContent = `${cur} / ${total} 페이지`;
+    });
+    wrap.innerHTML = '';
+    pages.forEach(p => wrap.appendChild(p));
+    msg.textContent = `총 ${pages.length}페이지`;
+    msg.style.color = '#8f8';
+  } catch(e) {
+    wrap.innerHTML = '<div style="color:#f66;padding:20px">오류: ' + e.message + '</div>';
+    msg.textContent = '';
+  }
+}
+
+/* 다운로드: 미리보기 페이지 DOM → html2canvas → jsPDF */
+document.getElementById('pdf-download-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('pdf-download-btn');
+  const msg = document.getElementById('pdf-progress-msg');
+
+  // 미리보기가 없으면 먼저 빌드
+  const existing = document.querySelectorAll('#pdf-pages-wrap .pdf-page');
+  if (!existing.length) {
+    msg.textContent = '페이지 생성 중...';
+    msg.style.color = '#aaa';
+    btn.disabled = true;
+    try {
+      const pages = await buildPdfPages((cur, total) => {
+        msg.textContent = `생성 중 ${cur}/${total}`;
+      });
+      const wrap = document.getElementById('pdf-pages-wrap');
+      wrap.innerHTML = '';
+      pages.forEach(p => wrap.appendChild(p));
+    } catch(e) {
+      alert('페이지 생성 오류: ' + e.message);
+      btn.disabled = false;
+      return;
+    }
+  }
+
+  const pages = document.querySelectorAll('#pdf-pages-wrap .pdf-page');
+  btn.textContent = '생성 중...';
+  btn.disabled = true;
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const A4_W_MM = 210;
+
+    for (let i = 0; i < pages.length; i++) {
+      msg.textContent = `캡처 중 ${i+1}/${pages.length}`;
+      const pageEl = pages[i];
+
+      // html2canvas: 실제 렌더링 크기 (가변 높이)
+      const pageW = pageEl.scrollWidth  || pageEl.offsetWidth  || 794;
+      const pageH = pageEl.scrollHeight || pageEl.offsetHeight || 200;
+
+      const canvas = await html2canvas(pageEl, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: pageW,
+        height: pageH,
+        windowWidth: pageW,
+        windowHeight: pageH,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.93);
+      // mm 환산: A4 너비 210mm 기준
+      const pageH_mm = A4_W_MM * (canvas.height / canvas.width);
+
+      if (i > 0) doc.addPage([A4_W_MM, pageH_mm]);
+      else {
+        // 첫 페이지: jsPDF 기본 A4 높이 조정
+        if (Math.abs(pageH_mm - 297) > 5) {
+          // 첫 페이지도 가변 높이로
+          doc.deletePage(1);
+          doc.addPage([A4_W_MM, pageH_mm]);
+        }
+      }
+      doc.addImage(imgData, 'JPEG', 0, 0, A4_W_MM, pageH_mm);
+    }
+
+    const fname = (currentEpubFilename || '단어장').replace(/[/\\?%*:|"<>]/g, '_');
+    doc.save(fname + '_단어장.pdf');
+    showToast('PDF 저장 완료!');
+    msg.textContent = `총 ${pages.length}페이지`;
+    msg.style.color = '#8f8';
+  } catch(e) {
+    alert('PDF 오류: ' + e.message);
+    console.error(e);
+    msg.textContent = '오류 발생';
+    msg.style.color = '#f66';
+  }
+  btn.textContent = '⬇ PDF 다운로드';
+  btn.disabled = false;
+});
+
+document.getElementById('pdf-close-btn').addEventListener('click', () => {
+  document.getElementById('pdf-preview-backdrop').classList.remove('open');
+});
+document.getElementById('pdf-preview-backdrop').addEventListener('click', e => {
+  if (e.target === document.getElementById('pdf-preview-backdrop'))
+    document.getElementById('pdf-preview-backdrop').classList.remove('open');
+});
+</script>
+</body>
+</html>
+
+  <!-- RIGHT: EPUB -->
